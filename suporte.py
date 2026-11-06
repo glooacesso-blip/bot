@@ -13,7 +13,6 @@ class Suporte(commands.Cog):
     async def abrir_ticket(self, interaction: discord.Interaction):
         guild = interaction.guild
         
-        # Verifica se já existe um ticket aberto para o usuário
         nome_canal = f"ticket-{interaction.user.name.lower()}"
         canal_existente = discord.utils.get(guild.text_channels, name=nome_canal)
         
@@ -21,7 +20,6 @@ class Suporte(commands.Cog):
             await interaction.response.send_message(f"❌ Você já tem um ticket aberto: {canal_existente.mention}", ephemeral=True)
             return
 
-        # Cria o canal privado
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
@@ -48,7 +46,6 @@ class Suporte(commands.Cog):
         
         await asyncio.sleep(segundos)
         
-        # Busca a mensagem atualizada
         mensagem = await interaction.channel.fetch_message(mensagem.id)
         reacao = discord.utils.get(mensagem.reactions, emoji="🎉")
         usuarios = [user async for user in reacao.users() if not user.bot]
