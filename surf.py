@@ -2,8 +2,24 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import os
+from flask import Flask
+from threading import Thread
 
-# Configuração de Intents
+# --- Configuração do Servidor Web (para o Render não dormir) ---
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Surf Trama está online!"
+
+def run_web():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run_web)
+    t.start()
+
+# --- Configuração do Bot ---
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -15,12 +31,9 @@ class SurfTramaBot(commands.Bot):
         self.COR_PRETA = 0x000000
 
     async def setup_hook(self):
-        # Carrega os módulos (Cogs)
         await self.load_extension("cogs.moderacao")
-        await self.load_extension("cogs.comunidade")
         await self.load_extension("cogs.suporte")
         
-        # Sincroniza os comandos
         await self.tree.sync()
         print(f"Comandos sincronizados para {self.user}")
 
@@ -34,7 +47,6 @@ async def on_ready():
         activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda")
     )
 
-# --- Sistema de Ajuda Básico (Apenas para não perder a função) ---
 @bot.tree.command(name="ajuda", description="Mostra o painel de ajuda do Surf Trama")
 async def ajuda(interaction: discord.Interaction):
     embed = discord.Embed(
@@ -44,15 +56,10 @@ async def ajuda(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# Tratamento de erro global
-@bot.tree.error
-async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    if isinstance(error, app_commands.MissingPermissions):
-        await interaction.response.send_message("🚫 Você não tem permissão para usar este comando.", ephemeral=True)
-
 if __name__ == "__main__":
     TOKEN = os.getenv("DISCORD_TOKEN")
     if not TOKEN:
         print("⚠️ Defina a variável DISCORD_TOKEN.")
     else:
+        keep_alive() # Inicia o servidor web
         bot.run(TOKEN)
