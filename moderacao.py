@@ -21,7 +21,7 @@ class Moderacao(commands.Cog):
         try:
             await usuario.send(f"⚠️ Você recebeu um aviso no servidor **{interaction.guild.name}**.\n**Motivo:** {motivo}")
         except discord.Forbidden:
-            pass # Usuário com DM fechada
+            pass
         
         embed = discord.Embed(title="⚠️ Aviso Aplicado", color=self.bot.COR_TRAMA)
         embed.add_field(name="Usuário", value=usuario.mention)
