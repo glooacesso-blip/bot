@@ -13,7 +13,6 @@ def home():
     return "Surf Trama está online!"
 
 def run_web():
-    # O Render define a porta na variável de ambiente PORT
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
@@ -33,11 +32,8 @@ class SurfTramaBot(commands.Bot):
         self.COR_PRETA = 0x000000
 
     async def setup_hook(self):
-        # Carrega os módulos da pasta cogs
         await self.load_extension("cogs.moderacao")
         await self.load_extension("cogs.suporte")
-        
-        # Sincroniza os comandos de barra
         await self.tree.sync()
         print(f"Comandos sincronizados para {self.user}")
 
@@ -49,11 +45,10 @@ async def on_ready():
     print(f'📡 Conectado a {len(bot.guilds)} servidor(es).')
     
     # Deixa o bot Online (Verde) com a atividade
-   await bot.change_presence(
-    status=discord.Status.online,
-    activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda")
-)
-    
+    await bot.change_presence(
+        status=discord.Status.online, 
+        activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda")
+    )
 
 @bot.tree.command(name="ajuda", description="Mostra o painel de ajuda do Surf Trama")
 async def ajuda(interaction: discord.Interaction):
@@ -62,10 +57,8 @@ async def ajuda(interaction: discord.Interaction):
         description="Use os comandos `/` para interagir.\n\n**Módulos Ativos:** Moderação, Suporte, Comunidade.",
         color=bot.COR_TRAMA
     )
-    embed.set_footer(text="TRAMA • Segurança e Engajamento")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# Tratamento de erros global
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
@@ -80,5 +73,5 @@ if __name__ == "__main__":
     if not TOKEN:
         print("⚠️ Defina a variável DISCORD_TOKEN no painel do Render.")
     else:
-        keep_alive() # Inicia o servidor web
+        keep_alive()
         bot.run(TOKEN)
