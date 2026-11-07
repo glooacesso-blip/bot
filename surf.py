@@ -2,14 +2,12 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import os
-import asyncio
 from flask import Flask
 from threading import Thread
 
 # --- Configuração do Servidor Web ---
 app = Flask('')
 
-# HTML da página inicial (Dashboard)
 HTML_PAGE = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -18,7 +16,7 @@ HTML_PAGE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surf Trama | Dashboard</title>
     <style>
-        body {
+        body {{
             background-color: #0a0a0a;
             color: #ffffff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -27,8 +25,8 @@ HTML_PAGE = """
             align-items: center;
             height: 100vh;
             margin: 0;
-        }
-        .container {
+        }}
+        .container {{
             background-color: #1a1a1a;
             border: 1px solid #8B0000;
             border-radius: 12px;
@@ -37,16 +35,16 @@ HTML_PAGE = """
             box-shadow: 0px 0px 20px rgba(139, 0, 0, 0.4);
             max-width: 500px;
             width: 100%;
-        }
-        h1 {
+        }}
+        h1 {{
             color: #ff3333;
             margin-bottom: 5px;
-        }
-        p.subtitle {
+        }}
+        p.subtitle {{
             color: #aaaaaa;
             margin-bottom: 30px;
-        }
-        .status {
+        }}
+        .status {{
             display: inline-block;
             background-color: #00ff00;
             color: #000;
@@ -56,41 +54,41 @@ HTML_PAGE = """
             font-size: 14px;
             margin-bottom: 20px;
             text-transform: uppercase;
-        }
-        .info-box {
+        }}
+        .info-box {{
             background-color: #0a0a0a;
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 15px;
             text-align: left;
-        }
-        .info-box strong {
+        }}
+        .info-box strong {{
             color: #ff3333;
-        }
-        ul {
+        }}
+        ul {{
             list-style-type: none;
             padding: 0;
             margin: 0;
-        }
-        li {
+        }}
+        li {{
             padding: 5px 0;
             border-bottom: 1px solid #222;
-        }
-        li:last-child {
+        }}
+        li:last-child {{
             border-bottom: none;
-        }
-        .footer {
+        }}
+        .footer {{
             margin-top: 30px;
             font-size: 12px;
             color: #555;
-        }
+        }}
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🌊 Surf Trama</h1>
         <p class="subtitle">Gerenciamento e Engajamento TRAMA</p>
-        <div class="status">Online 24/7</div>
+        <div class="status">Online</div>
         
         <div class="info-box">
             <strong>👑 Dono:</strong> DS BOYZAO
@@ -111,18 +109,21 @@ HTML_PAGE = """
 
 @app.route('/')
 def home():
-    # Pega a lista de servidores onde o bot está
-    guilds = [guild.name for guild in bot.guilds]
-    guild_list_html = "".join([f"<li>{g}</li>" for g in guilds])
-    
-    # Se não estiver em nenhum servidor
-    if not guilds:
-        guild_list_html = "<li>Nenhum servidor no momento.</li>"
+    if not bot.is_ready():
+        return "O bot está iniciando... Aguarde alguns segundos e recarregue a página.", 200
         
-    return HTML_PAGE.format(
-        guild_count=len(bot.guilds),
-        guild_list=guild_list_html
-    )
+    try:
+        guilds = [guild.name for guild in bot.guilds]
+        guild_list_html = "".join([f"<li>{g}</li>" for g in guilds])
+        if not guilds:
+            guild_list_html = "<li>Nenhum servidor no momento.</li>"
+            
+        return HTML_PAGE.format(
+            guild_count=len(bot.guilds),
+            guild_list=guild_list_html
+        )
+    except Exception as e:
+        return f"Erro ao carregar os dados: {e}", 500
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
@@ -161,7 +162,6 @@ async def on_ready():
     print(f'✅ Surf Trama v2.0 online como {bot.user}')
     print(f'📡 Conectado a {len(bot.guilds)} servidor(es).')
     
-    print("⏳ Tentando alterar status para Online...")
     await bot.change_presence(
         status=discord.Status.online, 
         activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda")
