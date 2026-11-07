@@ -49,10 +49,11 @@ async def on_ready():
     print(f'📡 Conectado a {len(bot.guilds)} servidor(es).')
     
     # Deixa o bot Online (Verde) com a atividade
-    await bot.change_presence(
-        status=discord.Status.online, 
-        activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda")
-    )
+   await bot.change_presence(
+    status=discord.Status.online,
+    activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda")
+)
+    
 
 @bot.tree.command(name="ajuda", description="Mostra o painel de ajuda do Surf Trama")
 async def ajuda(interaction: discord.Interaction):
