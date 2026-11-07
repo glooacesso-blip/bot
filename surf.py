@@ -36,12 +36,10 @@ HTML_PAGE = """
         <h1>🌊 Surf Trama</h1>
         <div class="status">Online</div>
         <p><strong>👑 Dono:</strong> DS BOYZAO</p>
-        
         <div class="info-box">
             <h2>📡 Servidores ({guild_count})</h2>
             <ul>{guild_list}</ul>
         </div>
-
         <div class="info-box">
             <h2>🎫 Tickets Abertos ({ticket_count})</h2>
             <table>
@@ -102,6 +100,7 @@ class SurfTramaBot(commands.Bot):
         self.COR_PRETA = 0x000000
 
     async def setup_hook(self):
+        print("⏳ Carregando módulos...")
         try:
             await self.load_extension("cogs.moderacao")
             await self.load_extension("cogs.suporte")
@@ -109,18 +108,25 @@ class SurfTramaBot(commands.Bot):
             await self.load_extension("cogs.membros")
             await self.load_extension("cogs.atendimento")
             await self.load_extension("cogs.redes_sociais")
-            await self.load_extension("cogs.utilitarios") # <--- NOVO MÓDULO
+            await self.load_extension("cogs.utilitarios")
             print("✅ Módulos carregados com sucesso.")
         except Exception as e:
-            print(f"❌ Erro ao carregar módulos: {e}")
-        await self.tree.sync()
-        print(f"🔄 Comandos sincronizados.")
+            print(f"❌ ERRO AO CARREGAR MÓDULOS: {e}")
+        
+        # Limpa comandos antigos do cache e sincroniza os novos
+        try:
+            print("🧹 Limpando cache de comandos antigos...")
+            await self.tree.sync()
+            print("✅ Comandos sincronizados com o Discord!")
+        except Exception as e:
+            print(f"❌ Erro ao sincronizar comandos: {e}")
 
 bot = SurfTramaBot()
 
 @bot.event
 async def on_ready():
     print(f'✅ Surf Trama v2.0 online como {bot.user}')
+    print(f'📡 Conectado a {len(bot.guilds)} servidor(es).')
     await bot.change_presence(status=discord.Status.online, activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda"))
 
 @bot.tree.command(name="ajuda", description="Mostra o painel de ajuda do Surf Trama")
