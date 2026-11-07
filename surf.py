@@ -8,7 +8,7 @@ from threading import Thread
 
 # --- Configuração do Servidor Web ---
 app = Flask('')
-SENHA_ADMIN = "trama123"
+SENHA_ADMIN = "trama123" # Senha para expulsar o bot pelo site
 
 HTML_PAGE = """
 <!DOCTYPE html>
@@ -36,10 +36,12 @@ HTML_PAGE = """
         <h1>🌊 Surf Trama</h1>
         <div class="status">Online</div>
         <p><strong>👑 Dono:</strong> DS BOYZAO</p>
+        
         <div class="info-box">
             <h2>📡 Servidores ({guild_count})</h2>
             <ul>{guild_list}</ul>
         </div>
+
         <div class="info-box">
             <h2>🎫 Tickets Abertos ({ticket_count})</h2>
             <table>
@@ -55,10 +57,14 @@ HTML_PAGE = """
 @app.route('/')
 def home():
     if not bot.is_ready(): return "Iniciando bot... Recarregue em 10 segundos.", 200
+    
+    # Servidores
     guilds = []
     for guild in bot.guilds:
         btn = f'<a href="/sair/{guild.id}?senha={SENHA_ADMIN}" class="btn-leave">Sair</a>'
         guilds.append(f"<li>{guild.name} {btn}</li>")
+    
+    # Tickets
     tickets = []
     try:
         conn = sqlite3.connect('tickets.db')
@@ -67,8 +73,15 @@ def home():
         for row in cursor.fetchall():
             tickets.append(f"<tr><td>@{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td></tr>")
         conn.close()
-    except: tickets.append(f"<tr><td colspan='3'>Erro no banco.</td></tr>")
-    return HTML_PAGE.format(guild_count=len(bot.guilds), guild_list="".join(guilds) if guilds else "<li>Nenhum</li>", ticket_count=len(tickets), ticket_list="".join(tickets) if tickets else "<tr><td colspan='3'>Nenhum ticket.</td></tr>")
+    except Exception as e:
+        tickets.append(f"<tr><td colspan='3'>Nenhum ticket ou erro no banco.</td></tr>")
+        
+    return HTML_PAGE.format(
+        guild_count=len(bot.guilds),
+        guild_list="".join(guilds) if guilds else "<li>Nenhum</li>",
+        ticket_count=len(tickets),
+        ticket_list="".join(tickets) if tickets else "<tr><td colspan='3'>Nenhum ticket aberto.</td></tr>"
+    )
 
 @app.route('/sair/<int:guild_id>')
 def sair_servidor(guild_id):
@@ -109,13 +122,14 @@ class SurfTramaBot(commands.Bot):
             await self.load_extension("cogs.atendimento")
             await self.load_extension("cogs.redes_sociais")
             await self.load_extension("cogs.utilitarios")
+            await self.load_extension("cogs.automacao") # <--- NOVO MÓDULO AQUI
             print("✅ Módulos carregados com sucesso.")
         except Exception as e:
             print(f"❌ ERRO AO CARREGAR MÓDULOS: {e}")
         
-        # Limpa comandos antigos do cache e sincroniza os novos
+        # Sincroniza os comandos com o Discord
         try:
-            print("🧹 Limpando cache de comandos antigos...")
+            print("🧹 Sincronizando comandos...")
             await self.tree.sync()
             print("✅ Comandos sincronizados com o Discord!")
         except Exception as e:
@@ -127,11 +141,20 @@ bot = SurfTramaBot()
 async def on_ready():
     print(f'✅ Surf Trama v2.0 online como {bot.user}')
     print(f'📡 Conectado a {len(bot.guilds)} servidor(es).')
-    await bot.change_presence(status=discord.Status.online, activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda"))
+    
+    await bot.change_presence(
+        status=discord.Status.online, 
+        activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda")
+    )
+    print("🟢 Status alterado com sucesso!")
 
 @bot.tree.command(name="ajuda", description="Mostra o painel de ajuda do Surf Trama")
 async def ajuda(interaction: discord.Interaction):
-    embed = discord.Embed(title="🌊 Central de Ajuda: Surf Trama", description="Use os comandos `/` para interagir.\n\n**Módulos:** Moderação, Suporte, Segurança, Membros, Atendimento, Redes Sociais e Utilitários.", color=bot.COR_TRAMA)
+    embed = discord.Embed(
+        title="🌊 Central de Ajuda: Surf Trama",
+        description="Use os comandos `/` para interagir.\n\n**Módulos Ativos:** Moderação, Suporte, Segurança, Membros, Atendimento, Redes Sociais, Utilitários e Automação.",
+        color=bot.COR_TRAMA
+    )
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @bot.tree.error
