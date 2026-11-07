@@ -9,36 +9,54 @@ import datetime
 class Suporte(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # Cria o banco de dados se não existir
         self.conn = sqlite3.connect('tickets.db')
         self.cursor = self.conn.cursor()
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS tickets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT,
-                user_name TEXT,
-                guild_name TEXT,
-                channel_name TEXT,
-                created_at TEXT
+                user_id TEXT, user_name TEXT, guild_name TEXT, channel_name TEXT, created_at TEXT
             )
         ''')
         self.conn.commit()
 
-    @app_commands.command(name="painel-ticket", description="Cria o painel de atendimento com botão e imagem.")
+    @app_commands.command(name="painel-ticket", description="Cria um painel de atendimento personalizado.")
     @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(imagem="Cole o link direto da imagem (ex: imgur, prnt.sc)")
-    async def painel_ticket(self, interaction: discord.Interaction, imagem: str = None):
-        texto = (
-            "**CENTRAL DE AJUDA E ACOLHIMENTO**\n\n"
-            "Estamos aqui para acolher e ajudar no que precisar. Este é um espaço seguro, onde você pode falar abertamente, sem julgamentos.\n\n"
-            "Quando se sentir à vontade, é só chamar!\n\n"
-            "Estamos com você."
-        )
-        embed = discord.Embed(description=texto, color=self.bot.COR_TRAMA)
-        if imagem: embed.set_image(url=imagem)
+    @app_commands.describe(
+        titulo="Título do painel",
+        descricao="O texto que vai dentro do painel",
+        texto_botao="O que vai escrito no botão verde (ex: Abrir Ticket)",
+        cor="Cor da barra lateral (Vermelho, Preto, Azul, Verde, Roxo, Amarelo)",
+        imagem="Link da imagem do banner (opcional)"
+    )
+    async def painel_ticket(self, interaction: discord.Interaction, titulo: str, descricao: str, texto_botao: str, cor: str, imagem: str = None):
         
-        await interaction.response.send_message("Painel criado!", ephemeral=True)
-        await interaction.channel.send(embed=embed, view=BotaoAbrirTicket())
+        # Mapeamento de cores
+        cores = {
+            "vermelho": discord.Color.red(),
+            "preto": discord.Color.from_rgb(0, 0, 0),
+            "azul": discord.Color.blue(),
+            "verde": discord.Color.green(),
+            "roxo": discord.Color.purple(),
+            "amarelo": discord.Color.gold(),
+            "trama": discord.Color.from_rgb(139, 0, 0) # Vermelho escuro
+        }
+        
+        # Define a cor (padrão é a cor da TRAMA se digitar errado)
+        cor_escolhida = cores.get(cor.lower(), self.bot.COR_TRAMA)
+
+        embed = discord.Embed(
+            title=titulo,
+            description=descricao,
+            color=cor_escolhida
+        )
+        
+        if imagem:
+            embed.set_image(url=imagem)
+            
+        embed.set_footer(text="TRAMA • Segurança e Acolhimento")
+        
+        await interaction.response.send_message("Painel criado com sucesso!", ephemeral=True)
+        await interaction.channel.send(embed=embed, view=BotaoAbrirTicket(texto_botao=texto_botao))
 
     async def criar_ticket(self, interaction: discord.Interaction):
         guild = interaction.guild
@@ -57,7 +75,6 @@ class Suporte(commands.Cog):
         
         canal = await guild.create_text_channel(nome_canal, overwrites=overwrites)
         
-        # SALVA NO BANCO DE DADOS
         agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
         self.cursor.execute(
             "INSERT INTO tickets (user_id, user_name, guild_name, channel_name, created_at) VALUES (?, ?, ?, ?, ?)",
@@ -89,15 +106,19 @@ class Suporte(commands.Cog):
             await interaction.channel.send(f"🏆 Parabéns {vencedor.mention}! Você ganhou **{premio}**!")
 
 class BotaoAbrirTicket(discord.ui.View):
-    def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="Iniciar Atendimento", style=discord.ButtonStyle.success, emoji="🎗️", custom_id="btn_abrir_v3")
+    def __init__(self, texto_botao: str):
+        super().__init__(timeout=None)
+        # Atualiza o texto do botão dinamicamente
+        self.children[0].label = texto_botao
+
+    @discord.ui.button(label="Iniciar Atendimento", style=discord.ButtonStyle.success, emoji="🎗️", custom_id="btn_abrir_v4")
     async def abrir(self, interaction: discord.Interaction, button: discord.ui.Button):
         cog = interaction.client.get_cog("Suporte")
         await cog.criar_ticket(interaction)
 
 class BotaoFecharTicket(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="Fechar Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="btn_fechar_v3")
+    @discord.ui.button(label="Fechar Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="btn_fechar_v4")
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Fechando...")
         await asyncio.sleep(3)
