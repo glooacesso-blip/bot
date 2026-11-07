@@ -2,11 +2,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import os
-from flask import Flask
+from flask import Flask, request, redirect
 from threading import Thread
 
 # --- Configuração do Servidor Web ---
 app = Flask('')
+
+# Senha secreta para poder expulsar o bot (MUDE ISSO PARA ALGO SEU)
+SENHA_ADMIN = "trama123" 
 
 HTML_PAGE = """
 <!DOCTYPE html>
@@ -23,7 +26,7 @@ HTML_PAGE = """
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
         }}
         .container {{
@@ -33,7 +36,7 @@ HTML_PAGE = """
             padding: 40px;
             text-align: center;
             box-shadow: 0px 0px 20px rgba(139, 0, 0, 0.4);
-            max-width: 500px;
+            max-width: 600px;
             width: 100%;
         }}
         h1 {{
@@ -71,11 +74,26 @@ HTML_PAGE = """
             margin: 0;
         }}
         li {{
-            padding: 5px 0;
+            padding: 10px 0;
             border-bottom: 1px solid #222;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }}
         li:last-child {{
             border-bottom: none;
+        }}
+        .btn-leave {{
+            background-color: #8B0000;
+            color: white;
+            text-decoration: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            transition: 0.2s;
+        }}
+        .btn-leave:hover {{
+            background-color: #ff3333;
         }}
         .footer {{
             margin-top: 30px;
@@ -110,11 +128,17 @@ HTML_PAGE = """
 @app.route('/')
 def home():
     if not bot.is_ready():
-        return "O bot está iniciando... Aguarde alguns segundos e recarregue a página.", 200
+        return "O bot está iniciando... Aguarde alguns segundos.", 200
         
     try:
-        guilds = [guild.name for guild in bot.guilds]
-        guild_list_html = "".join([f"<li>{g}</li>" for g in guilds])
+        # Cria a lista de servidores com o botão de sair
+        guilds = []
+        for guild in bot.guilds:
+            # Link aponta para a rota /sair, passando o ID do servidor e a senha
+            btn_html = f'<a href="/sair/{guild.id}?senha={SENHA_ADMIN}" class="btn-leave">Sair</a>'
+            guilds.append(f"<li><span>{guild.name}</span> {btn_html}</li>")
+            
+        guild_list_html = "".join(guilds)
         if not guilds:
             guild_list_html = "<li>Nenhum servidor no momento.</li>"
             
@@ -124,6 +148,27 @@ def home():
         )
     except Exception as e:
         return f"Erro ao carregar os dados: {e}", 500
+
+@app.route('/sair/<int:guild_id>')
+def sair_servidor(guild_id):
+    # Verifica se a senha na URL está correta
+    senha_digitada = request.args.get('senha')
+    if senha_digitada != SENHA_ADMIN:
+        return "❌ Acesso negado. Senha incorreta.", 403
+
+    guild = bot.get_guild(guild_id)
+    if guild:
+        # Cria uma tarefa assíncrona para o bot sair do servidor
+        import asyncio
+        asyncio.run_coroutine_threadsafe(guild.leave(), bot.loop)
+        return f"""
+        <body style="background-color: #0a0a0a; color: white; font-family: sans-serif; text-align: center; padding-top: 50px;">
+            <h2 style="color: #ff3333;">✅ O bot saiu do servidor: {guild.name}</h2>
+            <a href="/" style="color: #00ff00;">Voltar para o Dashboard</a>
+        </body>
+        """
+    
+    return "❌ Servidor não encontrado ou o bot já saiu.", 404
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
