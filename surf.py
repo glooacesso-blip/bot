@@ -47,8 +47,10 @@ bot = SurfTramaBot()
 async def on_ready():
     print(f'✅ Surf Trama v2.0 online como {bot.user}')
     print(f'📡 Conectado a {len(bot.guilds)} servidor(es).')
+    
+    # Deixa o bot Online (Verde) com a atividade
     await bot.change_presence(
-        status=discord.Status.online, # Força o status online
+        status=discord.Status.online, 
         activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda")
     )
 
