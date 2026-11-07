@@ -2,10 +2,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import os
+import asyncio
 from flask import Flask
 from threading import Thread
 
-# --- Configuração do Servidor Web (para o Render não dormir) ---
+# --- Configuração do Servidor Web ---
 app = Flask('')
 
 @app.route('/')
@@ -32,10 +33,15 @@ class SurfTramaBot(commands.Bot):
         self.COR_PRETA = 0x000000
 
     async def setup_hook(self):
-        await self.load_extension("cogs.moderacao")
-        await self.load_extension("cogs.suporte")
+        try:
+            await self.load_extension("cogs.moderacao")
+            await self.load_extension("cogs.suporte")
+            print("✅ Módulos carregados com sucesso.")
+        except Exception as e:
+            print(f"❌ Erro ao carregar módulos: {e}")
+        
         await self.tree.sync()
-        print(f"Comandos sincronizados para {self.user}")
+        print(f"🔄 Comandos sincronizados para {self.user}")
 
 bot = SurfTramaBot()
 
@@ -44,11 +50,12 @@ async def on_ready():
     print(f'✅ Surf Trama v2.0 online como {bot.user}')
     print(f'📡 Conectado a {len(bot.guilds)} servidor(es).')
     
-    # Deixa o bot Online (Verde) com a atividade
+    print("⏳ Tentando alterar status para Online...")
     await bot.change_presence(
         status=discord.Status.online, 
         activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda")
     )
+    print("🟢 Status alterado com sucesso!")
 
 @bot.tree.command(name="ajuda", description="Mostra o painel de ajuda do Surf Trama")
 async def ajuda(interaction: discord.Interaction):
