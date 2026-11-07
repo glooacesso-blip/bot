@@ -4,6 +4,69 @@ from discord.ext import commands
 import os
 from instagrapi import Client
 
+class RedesSociais(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.ig_usuario = os.getenv("IG_USER") 
+        self.ig_senha = os.getenv("IG_PASS")
+        self.cliente_ig = None
+
+    @app_commands.command(name="instagram", description="Mostra o último post do Instagram de um usuário.")
+    @app_commands.describe(usuario="O @ do perfil do Instagram (sem o @)")
+    async def instagram(self, interaction: discord.Interaction, usuario: str):
+        await interaction.response.defer()
+        
+        if not self.ig_usuario or not self.ig_senha:
+            await interaction.followup.send("❌ O dono do bot não configurou as credenciais do Instagram (IG_USER e IG_PASS).")
+            return
+
+        # Faz o login na primeira vez
+        if self.cliente_ig is None:
+            try:
+                self.cliente_ig = Client()
+                self.cliente_ig.login(self.ig_usuario, self.ig_senha)
+            except Exception as e:
+                await interaction.followup.send(f"❌ Erro ao logar no Instagram: {e}")
+                return
+
+        try:
+            # Pega o ID do usuário e a última mídia
+            user_id = self.cliente_ig.user_id_from_username(usuario)
+            medias = self.cliente_ig.user_medias(user_id, amount=1)
+            
+            if not medias:
+                await interaction.followup.send(f"❌ Nenhuma postagem encontrada para @{usuario}.")
+                return
+
+            post = medias[0]
+            
+            # Baixa a imagem do post (o instagrapi salva no servidor do Render)
+            filename = f"ig_{post.pk}.jpg"
+            self.cliente_ig.photo_download(post.pk, folder=".", filename=filename)
+
+            embed = discord.Embed(
+                title=f"📸 @{usuario}",
+                description=post.caption if post.caption else "Sem legenda.",
+                color=self.bot.COR_TRAMA
+            )
+            
+            # Envia a imagem como arquivo anexo
+            file = discord.File(filename, filename="instagram_post.jpg")
+            embed.set_image(url="attachment://instagram_post.jpg")
+            embed.set_footer(text=f"❤️ {post.like_count} curtidas • 💬 {post.comment_count} comentários")
+
+            await interaction.followup.send(embed=embed, file=file)
+            
+            # Limpa o arquivo do servidor
+            os.remove(filename)
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ Erro ao buscar Instagram. O perfil pode ser privado ou o post é um vídeo. Erro: {e}")import discord
+from discord import app_commands
+from discord.ext import commands
+import os
+from instagrapi import Client
+
 # Tenta importar o tweepy (pode não estar configurado)
 try:
     import tweepy
