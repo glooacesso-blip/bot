@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 import sqlite3
 import asyncio
+import datetime
 
 class Membros(commands.Cog):
     def __init__(self, bot):
@@ -10,6 +11,7 @@ class Membros(commands.Cog):
         self.conn = sqlite3.connect('tickets.db')
         self.cursor = self.conn.cursor()
         
+        # Tabelas que já existiam
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS reaction_roles (
                 message_id TEXT, emoji TEXT, role_id TEXT, guild_id TEXT
@@ -20,9 +22,15 @@ class Membros(commands.Cog):
                 guild_id TEXT, palavra TEXT, role_id TEXT
             )
         ''')
+        # NOVA TABELA: Configuração da Portaria
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS portaria (
+                guild_id TEXT PRIMARY KEY,
+                channel_id TEXT
+            )
+        ''')
         self.conn.commit()
         
-        # Inicia o loop dos contadores
         self.update_counters.start()
 
     # --- COMANDO LIMPAR ---
@@ -37,18 +45,60 @@ class Membros(commands.Cog):
         deleted = await interaction.channel.purge(limit=quantidade)
         await interaction.followup.send(f"✅ `{len(deleted)}` mensagens foram apagadas.", ephemeral=True)
 
-    # --- COMANDO PORTARIA ---
-    @app_commands.command(name="portaria", description="Cria a mensagem de boas-vindas no canal atual.")
+    # --- COMANDO PORTARIA (NOVO) ---
+    @app_commands.command(name="portaria", description="Define o canal atual como o canal de boas-vindas.")
     @app_commands.checks.has_permissions(administrator=True)
-    async def portaria(self, interaction: discord.Interaction, imagem: str = None):
+    async def portaria(self, interaction: discord.Interaction):
+        # Salva o ID do canal no banco de dados
+        self.cursor.execute("INSERT OR REPLACE INTO portaria VALUES (?, ?)", (str(interaction.guild_id), str(interaction.channel_id)))
+        self.conn.commit()
+        
         embed = discord.Embed(
-            title="👋 Bem-vindo(a) à TRAMA!",
-            description="Leia as regras, pegue seus cargos e divirta-se!",
+            title="✅ Portaria Configurada",
+            description=f"Este canal ({interaction.channel.mention}) agora é o canal de boas-vindas.\nQuando alguém entrar, o bot vai mandar uma mensagem aqui e no PV da pessoa.",
             color=self.bot.COR_TRAMA
         )
-        if imagem: embed.set_image(url=imagem)
-        await interaction.response.send_message("Painel criado!", ephemeral=True)
-        await interaction.channel.send(embed=embed)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # --- EVENTO DE ENTRADA DE MEMBRO (BOAS-VINDAS) ---
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        guild = member.guild
+        
+        # Verifica se o canal de portaria foi configurado
+        self.cursor.execute("SELECT channel_id FROM portaria WHERE guild_id = ?", (str(guild.id),))
+        result = self.cursor.fetchone()
+        
+        if not result:
+            return # Se não configurou, não faz nada
+            
+        canal_id = int(result[0])
+        canal = guild.get_channel(canal_id)
+        
+        if not canal:
+            return # Se o canal foi deletado, não faz nada
+
+        # Cria o Embed bonito
+        embed = discord.Embed(
+            title="🌊 Bem-vindo(a) à TRAMA!",
+            description=f"Olá {member.mention}, estamos muito felizes em ter você aqui!\n\nLeia as regras, pegue seus cargos e divirta-se.",
+            color=self.bot.COR_TRAMA
+        )
+        embed.set_thumbnail(url=member.display_avatar.url) # Foto de perfil do membro
+        embed.set_footer(text="Surf Trama • Comunidade")
+        embed.timestamp = discord.utils.utcnow()
+
+        # 1. Envia no Canal de Boas-vindas
+        try:
+            await canal.send(content=member.mention, embed=embed)
+        except discord.Forbidden:
+            pass
+
+        # 2. Envia no PV (Direct Message)
+        try:
+            await member.send(embed=embed)
+        except discord.Forbidden:
+            pass # Se a pessoa tiver o PV fechado, o bot ignora
 
     # --- COMANDO CARGOS ---
     @app_commands.command(name="cargos", description="Lista todos os cargos do servidor.")
@@ -83,100 +133,67 @@ class Membros(commands.Cog):
                     await membro.add_roles(cargo); count += 1
                 elif acao.value == "remove" and cargo in membro.roles:
                     await membro.remove_roles(cargo); count += 1
-                await asyncio.sleep(1) # Evita bloqueio do Discord
+                await asyncio.sleep(1)
             except: pass
         await interaction.followup.send(f"✅ Cargo alterado para **{count}** membros.")
 
-    # --- NOVO: COMANDO CARGO POR BIO ---
+    # --- COMANDO CARGO POR BIO ---
     @app_commands.command(name="cargo-por-bio", description="Dá um cargo para quem tem uma palavra específica na bio.")
     @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(palavra="A palavra que deve estar na bio", cargo="O cargo a ser dado")
     async def cargo_por_bio(self, interaction: discord.Interaction, palavra: str, cargo: discord.Role):
-        await interaction.response.send_message(f"⏳ Lendo as bios de todos os membros... Isso pode demorar.", ephemeral=True)
-        
-        # Salva a regra no banco (para podermos rodar de novo no futuro)
+        await interaction.response.send_message(f"⏳ Lendo as bios...", ephemeral=True)
         self.cursor.execute("INSERT INTO bio_roles VALUES (?, ?, ?)", (str(interaction.guild_id), palavra.lower(), str(cargo.id)))
         self.conn.commit()
-
         count = 0
-        # O Discord exige que busquemos os membros um por um para ler a bio
         async for membro in interaction.guild.fetch_members(limit=None):
             if membro.bot: continue
-            
-            # A API do Discord pode não retornar a bio de todos por privacidade, então usamos try
             try:
-                bio = membro.bio if membro.bio else ""
-                if palavra.lower() in bio.lower() and cargo not in membro.roles:
+                if membro.bio and palavra.lower() in membro.bio.lower() and cargo not in membro.roles:
                     await membro.add_roles(cargo)
                     count += 1
                     await asyncio.sleep(1)
             except: pass
-            
-        await interaction.followup.send(f"✅ **{count}** membros tinham a palavra `{palavra}` na bio e receberam o cargo {cargo.mention}.")
+        await interaction.followup.send(f"✅ **{count}** membros receberam o cargo {cargo.mention}.")
 
-    # --- NOVO: COMANDO PRIMEIRA DAMA ---
-    @app_commands.command(name="primeira-dama", description="Dá o cargo especial de destaque (Primeira Dama).")
+    # --- COMANDO PRIMEIRA DAMA ---
+    @app_commands.command(name="primeira-dama", description="Dá o cargo especial de destaque.")
     @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(usuario="A pessoa que receberá o cargo especial")
     async def primeira_dama(self, interaction: discord.Interaction, usuario: discord.Member):
-        # Tenta achar um cargo chamado "Primeira Dama" ou cria um novo
         cargo = discord.utils.get(interaction.guild.roles, name="👑 Primeira Dama")
-        
         if not cargo:
-            # Cria o cargo com cor rosa/dourada, separado dos outros
             cargo = await interaction.guild.create_role(name="👑 Primeira Dama", color=discord.Color.gold(), hoist=True)
-        
         await usuario.add_roles(cargo)
-        
-        embed = discord.Embed(
-            title="👑 Nova Primeira Dama!",
-            description=f"{usuario.mention} agora é a **Primeira Dama** da TRAMA!\nEla tem permissões especiais e o cargo de maior destaque.",
-            color=discord.Color.gold()
-        )
+        embed = discord.Embed(title="👑 Nova Primeira Dama!", description=f"{usuario.mention} agora é a **Primeira Dama** da TRAMA!", color=discord.Color.gold())
         await interaction.response.send_message(embed=embed)
-        await interaction.channel.send(f"Parabéns, {usuario.mention}! 🎉")
 
-    # --- NOVO: SISTEMA DE CONTADORES (CANAIS DE VOZ) ---
+    # --- COMANDO CONTADORES ---
     @app_commands.command(name="contadores", description="Cria canais de voz que mostram a contagem do servidor.")
     @app_commands.checks.has_permissions(administrator=True)
     async def contadores(self, interaction: discord.Interaction):
         guild = interaction.guild
-        await interaction.response.send_message("Criando canais de contagem...", ephemeral=True)
-        
-        # Cria os canais de voz (eles vão ser trancados para ninguém entrar)
+        await interaction.response.send_message("Criando canais...", ephemeral=True)
         cat = await guild.create_category("📊 Estatísticas")
-        
         await guild.create_voice_channel(f"👥 Membros: {guild.member_count}", category=cat)
         online = sum(1 for m in guild.members if m.status != discord.Status.offline)
         await guild.create_voice_channel(f"🟢 Online: {online}", category=cat)
-        
-        # Verifica se a categoria ficou visível e tranca os canais para ninguém entrar
         for channel in cat.channels:
             await channel.set_permissions(guild.default_role, connect=False)
+        await interaction.followup.send("✅ Canais criados!")
 
-        await interaction.followup.send("✅ Canais criados! Eles vão atualizar sozinhos a cada 10 minutos.")
-
-    # Loop que roda a cada 10 minutos para atualizar o nome dos contadores
     @tasks.loop(minutes=10)
     async def update_counters(self):
         for guild in self.bot.guilds:
             try:
-                # Busca os canais de voz que começam com os emojis
                 membros_channel = discord.utils.get(guild.voice_channels, name=f"👥 Membros: {guild.member_count}")
                 online_count = sum(1 for m in guild.members if m.status != discord.Status.offline)
-                online_channel = discord.utils.get(guild.voice_channels, name=lambda c: c.startswith("🟢 Online:")) # Precisa buscar por prefixo
-                
-                # Atualiza o canal de membros
+                online_channel = discord.utils.get(guild.voice_channels, name=lambda c: c.startswith("🟢 Online:"))
                 if membros_channel:
                     await membros_channel.edit(name=f"👥 Membros: {guild.member_count}")
-                
-                # Atualiza o canal de online (precisa buscar todos e ver qual começa com 🟢)
                 for channel in guild.voice_channels:
                     if channel.name.startswith("🟢 Online:"):
                         await channel.edit(name=f"🟢 Online: {online_count}")
                         break
-            except Exception:
-                pass
+            except: pass
 
     # --- EVENTOS DE REAÇÃO ---
     @commands.Cog.listener()
