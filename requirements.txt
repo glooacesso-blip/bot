@@ -1,5 +1,4 @@
 discord.py
 flask
-yt-dlp
+instagrapi
 tweepy
-instagram-to-discord
