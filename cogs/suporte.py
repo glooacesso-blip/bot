@@ -8,11 +8,31 @@ class Suporte(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    # --- SISTEMA DE TICKETS ---
+    # --- COMANDO PARA CRIAR O PAINEL NO CANAL ---
+    @app_commands.command(name="painel-ticket", description="Cria a mensagem com o botão de abrir ticket.")
+    @app_commands.checks.has_permissions(administrator=True) # Apenas admins podem usar
+    async def painel_ticket(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="🎫 Central de Atendimento TRAMA",
+            description="Precisa de ajuda, suporte ou quer fazer uma parceria?\nClique no botão abaixo para abrir um ticket privado com a nossa equipe.",
+            color=self.bot.COR_TRAMA
+        )
+        embed.set_footer(text="Surf Trama • Suporte")
+        
+        # Envia a mensagem com o botão
+        await interaction.response.send_message("Painel criado com sucesso!", ephemeral=True)
+        await interaction.channel.send(embed=embed, view=BotaoAbrirTicket())
+
+    # --- COMANDO DE ABRIR TICKET (Mantido para caso queiram usar o comando direto) ---
     @app_commands.command(name="tickets", description="Abre um ticket de suporte privado.")
     async def abrir_ticket(self, interaction: discord.Interaction):
+        await self.criar_ticket(interaction)
+
+    # --- FUNÇÃO INTERNA PARA CRIAR O TICKET ---
+    async def criar_ticket(self, interaction: discord.Interaction):
         guild = interaction.guild
         
+        # Verifica se já existe um ticket aberto
         nome_canal = f"ticket-{interaction.user.name.lower()}"
         canal_existente = discord.utils.get(guild.text_channels, name=nome_canal)
         
@@ -20,6 +40,7 @@ class Suporte(commands.Cog):
             await interaction.response.send_message(f"❌ Você já tem um ticket aberto: {canal_existente.mention}", ephemeral=True)
             return
 
+        # Cria o canal privado
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
@@ -56,11 +77,24 @@ class Suporte(commands.Cog):
             vencedor = random.choice(usuarios)
             await interaction.channel.send(f"🏆 Parabéns {vencedor.mention}! Você ganhou **{premio}**!")
 
+# --- BOTÕES DA INTERFACE ---
+
+# Botão de ABRIR ticket (que fica no painel)
+class BotaoAbrirTicket(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Abrir Ticket", style=discord.ButtonStyle.green, emoji="📩", custom_id="btn_abrir_ticket")
+    async def abrir(self, interaction: discord.Interaction, button: discord.ui.Button):
+        cog = interaction.client.get_cog("Suporte")
+        await cog.criar_ticket(interaction)
+
+# Botão de FECHAR ticket (que fica dentro do ticket)
 class BotaoFecharTicket(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Fechar Ticket", style=discord.ButtonStyle.red, emoji="🔒")
+    @discord.ui.button(label="Fechar Ticket", style=discord.ButtonStyle.red, emoji="🔒", custom_id="btn_fechar_ticket")
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Fechando ticket em 5 segundos...")
         await asyncio.sleep(5)
