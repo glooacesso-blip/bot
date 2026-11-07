@@ -1,99 +1,142 @@
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
-import sqlite3
-import asyncio
+from discord.ext import commands
 import os
-import yt_dlp
-import tweepy
-from instagram_to_discord import DiscordInstagramPoster
+from instagrapi import Client
+
+# Tenta importar o tweepy (pode não estar configurado)
+try:
+    import tweepy
+    TWEEPY_DISPONIVEL = True
+except ImportError:
+    TWEEPY_DISPONIVEL = False
 
 class RedesSociais(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.conn = sqlite3.connect('tickets.db')
-        self.cursor = self.conn.cursor()
         
-        # Tabelas para lives e usernames
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS lives (
-                guild_id TEXT, user_id TEXT, platform TEXT, channel_id TEXT
-            )
-        ''')
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS usernames (
-                guild_id TEXT, user_id TEXT, custom_name TEXT
-            )
-        ''')
-        self.conn.commit()
-
-    # --- COMANDO /TELLONYM (Caixa de Perguntas Anônimas) ---
-    @app_commands.command(name="tellonym", description="Envia uma pergunta anônima para um canal específico.")
-    @app_commands.describe(pergunta="O que você quer perguntar? (Sua identidade não será revelada)")
-    async def tellonym(self, interaction: discord.Interaction, pergunta: str):
-        # Canal onde as perguntas vão cair (troque o ID pelo seu)
-        CANAL_ID = 123456789012345678 
-        canal = self.bot.get_channel(CANAL_ID)
+        # --- CONFIGURAÇÃO DO INSTAGRAM ---
+        # É recomendável usar variáveis de ambiente, mas para teste você pode colocar aqui
+        self.ig_usuario = os.getenv("IG_USER") 
+        self.ig_senha = os.getenv("IG_PASS")
+        self.cliente_ig = None
         
-        if not canal:
-            await interaction.response.send_message("❌ Canal de perguntas não configurado.", ephemeral=True)
-            return
-            
-        embed = discord.Embed(title="🕵️ Pergunta Anônima", description=pergunta, color=self.bot.COR_TRAMA)
-        embed.set_footer(text="Tellonym • TRAMA")
-        await canal.send(embed=embed)
-        await interaction.response.send_message("✅ Sua pergunta foi enviada anonimamente!", ephemeral=True)
+        # --- CONFIGURAÇÃO DO TWITTER ---
+        self.twitter_bearer = os.getenv("TWITTER_BEARER_TOKEN")
+        self.cliente_twitter = None
+        if TWEEPY_DISPONIVEL and self.twitter_bearer:
+            try:
+                self.cliente_twitter = tweepy.Client(bearer_token=self.twitter_bearer)
+            except Exception as e:
+                print(f"Erro ao configurar Twitter: {e}")
 
-    # --- COMANDO /LIVES (Notificar quando alguém estiver em live) ---
-    @app_commands.command(name="lives", description="Configura um canal para receber notificações de live (Twitch/YouTube).")
-    @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(usuario="Quem você quer monitorar", plataforma="Twitch ou YouTube", canal_notificacao="Onde avisar")
-    async def lives(self, interaction: discord.Interaction, usuario: discord.Member, plataforma: str, canal_notificacao: discord.TextChannel):
-        self.cursor.execute("INSERT INTO lives VALUES (?, ?, ?, ?)", (str(interaction.guild_id), str(usuario.id), plataforma, str(canal_notificacao.id)))
-        self.conn.commit()
-        await interaction.response.send_message(f"✅ Monitorando **{usuario.name}** na **{plataforma}**. Avisos em {canal_notificacao.mention}.", ephemeral=True)
-
-    # --- COMANDO /DOWNLOADER-VIDEO (Baixar vídeos) ---
-    @app_commands.command(name="downloader-video", description="Baixa um vídeo do YouTube, TikTok ou Instagram.")
-    @app_commands.describe(url="Cole o link do vídeo")
-    async def downloader_video(self, interaction: discord.Interaction, url: str):
+    # --- COMANDO /INSTAGRAM ---
+    @app_commands.command(name="instagram", description="Mostra as últimas fotos do Instagram de um usuário.")
+    @app_commands.describe(usuario="O @ do perfil do Instagram (sem o @)")
+    async def instagram(self, interaction: discord.Interaction, usuario: str):
         await interaction.response.defer()
         
-        # Configurações do yt-dlp para pegar o melhor vídeo em mp4
-        ydl_opts = {
-            'format': 'best[ext=mp4]/best',
-            'outtmpl': 'video.%(ext)s',
-            'quiet': True,
-            'no_warnings': True,
-        }
-        
+        if not self.ig_usuario or not self.ig_senha:
+            await interaction.followup.send("❌ O dono do bot não configurou as credenciais do Instagram (IG_USER e IG_PASS).")
+            return
+
+        # Faz o login na primeira vez (para não precisar fazer sempre)
+        if self.cliente_ig is None:
+            try:
+                self.cliente_ig = Client()
+                self.cliente_ig.login(self.ig_usuario, self.ig_senha)
+            except Exception as e:
+                await interaction.followup.send(f"❌ Erro ao logar no Instagram: {e}")
+                return
+
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                filename = ydl.prepare_filename(info)
-                
-            # Envia o arquivo para o Discord
-            await interaction.followup.send(file=discord.File(filename))
+            # Pega o ID do usuário e as últimas 5 mídias
+            user_id = self.cliente_ig.user_id_from_username(usuario)
+            medias = self.cliente_ig.user_medias(user_id, amount=5)
             
-            # Apaga o arquivo do servidor após enviar
-            os.remove(filename)
+            if not medias:
+                await interaction.followup.send(f"❌ Nenhuma postagem encontrada para @{usuario}.")
+                return
+
+            embed = discord.Embed(
+                title=f"📸 Instagram: @{usuario}",
+                description="Últimas 5 postagens:",
+                color=self.bot.COR_TRAMA
+            )
+            
+            # Adiciona a primeira foto como destaque
+            primeira_foto = medias[0]
+            embed.set_image(url=str(primeira_foto.thumbnail_url))
+            
+            # Lista as outras como links
+            for i, media in enumerate(medias):
+                embed.add_field(
+                    name=f"Post {i+1}", 
+                    value=f"[Clique para ver](https://www.instagram.com/p/{media.code}/)", 
+                    inline=True
+                )
+                
+            await interaction.followup.send(embed=embed)
+            
         except Exception as e:
-            await interaction.followup.send(f"❌ Erro ao baixar: O link pode ser inválido ou muito grande. Erro: {e}")
+            await interaction.followup.send(f"❌ Erro ao buscar Instagram. O perfil pode ser privado ou inexistente. Erro: {e}")
 
-    # --- COMANDO /USERNAMES (Sistema de Nomes Personalizados) ---
-    @app_commands.command(name="usernames", description="Define um nome personalizado para você no servidor.")
-    @app_commands.describe(nome="O nome que você quer usar")
-    async def usernames(self, interaction: discord.Interaction, nome: str):
-        self.cursor.execute("INSERT OR REPLACE INTO usernames VALUES (?, ?, ?)", (str(interaction.guild_id), str(interaction.user.id), nome))
-        self.conn.commit()
-        await interaction.response.send_message(f"✅ Seu nome personalizado agora é **{nome}**.", ephemeral=True)
-
-# --- TAREFA DE FUNDO PARA VERIFICAR LIVES ---
-    @tasks.loop(minutes=5)
-    async def check_lives(self):
-        # Aqui você precisaria de APIs da Twitch/YouTube para verificar se a pessoa está online.
-        # Como é complexo, deixei um exemplo de como seria a lógica.
-        print("Verificando lives... (Necessário configurar API)")
+    # --- COMANDO /TWITTER ---
+    @app_commands.command(name="twitter", description="Mostra os últimos tweets de um usuário.")
+    @app_commands.describe(usuario="O @ do perfil do Twitter (sem o @)")
+    async def twitter(self, interaction: discord.Interaction, usuario: str):
+        await interaction.response.defer()
         
+        if not TWEEPY_DISPONIVEL:
+            await interaction.followup.send("❌ A biblioteca `tweepy` não está instalada corretamente.")
+            return
+
+        if not self.cliente_twitter:
+            await interaction.followup.send("❌ O dono do bot não configurou a chave de API do Twitter (TWITTER_BEARER_TOKEN).")
+            return
+
+        try:
+            # Busca o usuário pelo username
+            user = self.cliente_twitter.get_user(username=usuario)
+            if not user.data:
+                await interaction.followup.send(f"❌ Usuário @{usuario} não encontrado.")
+                return
+            
+            # Pega os últimos 5 tweets
+            tweets = self.cliente_twitter.get_users_tweets(
+                id=user.data.id, 
+                max_results=5,
+                tweet_fields=['created_at', 'public_metrics']
+            )
+            
+            if not tweets.data:
+                await interaction.followup.send(f"❌ Nenhum tweet recente de @{usuario}.")
+                return
+
+            embed = discord.Embed(
+                title=f"🐦 Twitter: @{usuario}",
+                description="Últimos tweets:",
+                color=self.bot.COR_TRAMA
+            )
+            
+            for tweet in tweets.data:
+                data_formatada = tweet.created_at.strftime("%d/%m/%Y") if tweet.created_at else "Data desconhecida"
+                curtidas = tweet.public_metrics.get('like_count', 0) if tweet.public_metrics else 0
+                
+                # Limita o texto do tweet para não estourar o embed
+                texto = tweet.text if len(tweet.text) < 150 else tweet.text[:147] + "..."
+                
+                embed.add_field(
+                    name=f"📅 {data_formatada} • ❤️ {curtidas}",
+                    value=texto,
+                    inline=False
+                )
+                
+            embed.set_footer(text="Fonte: Twitter API v2")
+            await interaction.followup.send(embed=embed)
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ Erro ao buscar Twitter. Verifique se a API Key é válida. Erro: {e}")
+
 async def setup(bot):
     await bot.add_cog(RedesSociais(bot))
