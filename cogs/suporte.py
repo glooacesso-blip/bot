@@ -19,44 +19,36 @@ class Suporte(commands.Cog):
         ''')
         self.conn.commit()
 
-    @app_commands.command(name="painel-ticket", description="Cria um painel de atendimento personalizado.")
+    @app_commands.command(name="painel-ticket", description="Cria o painel de atendimento (já vem configurado com o visual TRAMA).")
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.describe(
-        titulo="Título do painel",
-        descricao="O texto que vai dentro do painel",
-        texto_botao="O que vai escrito no botão verde (ex: Abrir Ticket)",
-        cor="Cor da barra lateral (Vermelho, Preto, Azul, Verde, Roxo, Amarelo)",
-        imagem="Link da imagem do banner (opcional)"
+        imagem="Link da imagem do banner (Opcional. Se não colocar, usará o padrão).",
+        titulo="Título do painel (Opcional. Padrão: CENTRAL DE AJUDA)",
+        texto_botao="Texto do botão (Opcional. Padrão: Abrir Ticket)"
     )
-    async def painel_ticket(self, interaction: discord.Interaction, titulo: str, descricao: str, texto_botao: str, cor: str, imagem: str = None):
+    async def painel_ticket(self, interaction: discord.Interaction, imagem: str = None, titulo: str = "CENTRAL DE AJUDA E ACOLHIMENTO", texto_botao: str = "Abrir Ticket"):
         
-        # Mapeamento de cores
-        cores = {
-            "vermelho": discord.Color.red(),
-            "preto": discord.Color.from_rgb(0, 0, 0),
-            "azul": discord.Color.blue(),
-            "verde": discord.Color.green(),
-            "roxo": discord.Color.purple(),
-            "amarelo": discord.Color.gold(),
-            "trama": discord.Color.from_rgb(139, 0, 0) # Vermelho escuro
-        }
-        
-        # Define a cor (padrão é a cor da TRAMA se digitar errado)
-        cor_escolhida = cores.get(cor.lower(), self.bot.COR_TRAMA)
-
-        embed = discord.Embed(
-            title=titulo,
-            description=descricao,
-            color=cor_escolhida
+        # Texto padrão bonito
+        texto = (
+            "Estamos aqui para acolher e ajudar no que precisar. Este é um espaço seguro, onde você pode falar abertamente, sem julgamentos.\n\n"
+            "Se preferir, também podemos conversar por call, às vezes falar é mais leve do que escrever. Quando se sentir à vontade, é só chamar!\n\n"
+            "Estamos com você."
         )
         
+        embed = discord.Embed(
+            title=titulo,
+            description=texto,
+            color=self.bot.COR_TRAMA # Sempre Vermelho Escuro
+        )
+        
+        # Se você colocar o link da imagem, ele adiciona
         if imagem:
             embed.set_image(url=imagem)
             
         embed.set_footer(text="TRAMA • Segurança e Acolhimento")
         
         await interaction.response.send_message("Painel criado com sucesso!", ephemeral=True)
-        await interaction.channel.send(embed=embed, view=BotaoAbrirTicket(texto_botao=texto_botao))
+        await interaction.channel.send(embed=embed, view=BotaoAbrirTicket(texto_botao))
 
     async def criar_ticket(self, interaction: discord.Interaction):
         guild = interaction.guild
@@ -86,39 +78,19 @@ class Suporte(commands.Cog):
         await canal.send(embed=embed, view=BotaoFecharTicket())
         await interaction.response.send_message(f"✅ Ticket criado em {canal.mention}", ephemeral=True)
 
-    @app_commands.command(name="sorteio", description="Cria um sorteio no canal.")
-    @app_commands.describe(premio="O que será sorteado", segundos="Duração em segundos")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def sorteio(self, interaction: discord.Interaction, premio: str, segundos: int):
-        embed = discord.Embed(title="🎉 SORTEIO!", description=f"Prêmio: **{premio}**\nReaja com 🎉 para participar!", color=self.bot.COR_TRAMA)
-        await interaction.response.send_message("Sorteio iniciado!", ephemeral=True)
-        mensagem = await interaction.channel.send(embed=embed)
-        await mensagem.add_reaction("🎉")
-        await asyncio.sleep(segundos)
-        
-        mensagem = await interaction.channel.fetch_message(mensagem.id)
-        reacao = discord.utils.get(mensagem.reactions, emoji="🎉")
-        usuarios = [user async for user in reacao.users() if not user.bot]
-        
-        if not usuarios: await interaction.channel.send(f"❌ Nenhum participante.")
-        else:
-            vencedor = random.choice(usuarios)
-            await interaction.channel.send(f"🏆 Parabéns {vencedor.mention}! Você ganhou **{premio}**!")
-
 class BotaoAbrirTicket(discord.ui.View):
     def __init__(self, texto_botao: str):
         super().__init__(timeout=None)
-        # Atualiza o texto do botão dinamicamente
         self.children[0].label = texto_botao
 
-    @discord.ui.button(label="Iniciar Atendimento", style=discord.ButtonStyle.success, emoji="🎗️", custom_id="btn_abrir_v4")
+    @discord.ui.button(label="Abrir Ticket", style=discord.ButtonStyle.success, emoji="🎗️", custom_id="btn_abrir_v5")
     async def abrir(self, interaction: discord.Interaction, button: discord.ui.Button):
         cog = interaction.client.get_cog("Suporte")
         await cog.criar_ticket(interaction)
 
 class BotaoFecharTicket(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="Fechar Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="btn_fechar_v4")
+    @discord.ui.button(label="Fechar Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="btn_fechar_v5")
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Fechando...")
         await asyncio.sleep(3)
