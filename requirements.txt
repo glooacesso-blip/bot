@@ -1,2 +1,5 @@
 discord.py
 flask
+yt-dlp
+tweepy
+instagram-to-discord
