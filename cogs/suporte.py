@@ -8,31 +8,39 @@ class Suporte(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    # --- COMANDO PARA CRIAR O PAINEL NO CANAL ---
-    @app_commands.command(name="painel-ticket", description="Cria a mensagem com o botão de abrir ticket.")
-    @app_commands.checks.has_permissions(administrator=True) # Apenas admins podem usar
-    async def painel_ticket(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            title="🎫 Central de Atendimento TRAMA",
-            description="Precisa de ajuda, suporte ou quer fazer uma parceria?\nClique no botão abaixo para abrir um ticket privado com a nossa equipe.",
-            color=self.bot.COR_TRAMA
-        )
-        embed.set_footer(text="Surf Trama • Suporte")
+    # --- COMANDO PARA CRIAR O PAINEL BONITO ---
+    @app_commands.command(name="painel-ticket", description="Cria o painel de atendimento com botão e imagem.")
+    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.describe(imagem="Cole o link direto da imagem (ex: imgur, prnt.sc)")
+    async def painel_ticket(self, interaction: discord.Interaction, imagem: str = None):
         
-        # Envia a mensagem com o botão
+        # Texto do painel
+        texto = (
+            "**CENTRAL DE AJUDA E ACOLHIMENTO**\n\n"
+            "Estamos aqui para acolher e ajudar no que precisar. Este é um espaço seguro, onde você pode falar abertamente, sem julgamentos.\n\n"
+            "Se preferir, também podemos conversar por call, às vezes falar é mais leve do que escrever. Quando se sentir à vontade, é só chamar!\n\n"
+            "Estamos com você."
+        )
+        
+        # Cria o Embed (a caixa bonita)
+        embed = discord.Embed(
+            description=texto,
+            color=self.bot.COR_TRAMA # Vermelho escuro
+        )
+        
+        # Se você passar o link de uma imagem, ela aparece aqui
+        if imagem:
+            embed.set_image(url=imagem)
+            
+        embed.set_footer(text="TRAMA • Segurança e Acolhimento")
+        
         await interaction.response.send_message("Painel criado com sucesso!", ephemeral=True)
         await interaction.channel.send(embed=embed, view=BotaoAbrirTicket())
-
-    # --- COMANDO DE ABRIR TICKET (Mantido para caso queiram usar o comando direto) ---
-    @app_commands.command(name="tickets", description="Abre um ticket de suporte privado.")
-    async def abrir_ticket(self, interaction: discord.Interaction):
-        await self.criar_ticket(interaction)
 
     # --- FUNÇÃO INTERNA PARA CRIAR O TICKET ---
     async def criar_ticket(self, interaction: discord.Interaction):
         guild = interaction.guild
         
-        # Verifica se já existe um ticket aberto
         nome_canal = f"ticket-{interaction.user.name.lower()}"
         canal_existente = discord.utils.get(guild.text_channels, name=nome_canal)
         
@@ -40,7 +48,6 @@ class Suporte(commands.Cog):
             await interaction.response.send_message(f"❌ Você já tem um ticket aberto: {canal_existente.mention}", ephemeral=True)
             return
 
-        # Cria o canal privado
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
@@ -49,7 +56,7 @@ class Suporte(commands.Cog):
         
         canal = await guild.create_text_channel(nome_canal, overwrites=overwrites)
         
-        embed = discord.Embed(title="🎫 Ticket Aberto", description=f"Olá {interaction.user.mention}, a equipe da TRAMA foi notificada.\nDescreva seu problema abaixo.", color=self.bot.COR_TRAMA)
+        embed = discord.Embed(title="🎫 Ticket Aberto", description=f"Olá {interaction.user.mention}, a equipe da TRAMA foi notificada.\nDescreva o que você precisa abaixo.", color=self.bot.COR_TRAMA)
         await canal.send(embed=embed, view=BotaoFecharTicket())
         await interaction.response.send_message(f"✅ Ticket criado em {canal.mention}", ephemeral=True)
 
@@ -79,22 +86,22 @@ class Suporte(commands.Cog):
 
 # --- BOTÕES DA INTERFACE ---
 
-# Botão de ABRIR ticket (que fica no painel)
+# Botão de ABRIR ticket (Verde)
 class BotaoAbrirTicket(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Abrir Ticket", style=discord.ButtonStyle.green, emoji="📩", custom_id="btn_abrir_ticket")
+    @discord.ui.button(label="Iniciar Atendimento", style=discord.ButtonStyle.success, emoji="🎗️", custom_id="btn_abrir_ticket_v2")
     async def abrir(self, interaction: discord.Interaction, button: discord.ui.Button):
         cog = interaction.client.get_cog("Suporte")
         await cog.criar_ticket(interaction)
 
-# Botão de FECHAR ticket (que fica dentro do ticket)
+# Botão de FECHAR ticket (Vermelho)
 class BotaoFecharTicket(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Fechar Ticket", style=discord.ButtonStyle.red, emoji="🔒", custom_id="btn_fechar_ticket")
+    @discord.ui.button(label="Fechar Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="btn_fechar_ticket_v2")
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Fechando ticket em 5 segundos...")
         await asyncio.sleep(5)
