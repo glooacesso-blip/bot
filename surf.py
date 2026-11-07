@@ -118,6 +118,7 @@ class SurfTramaBot(commands.Bot):
             await self.load_extension("cogs.suporte")
             await self.load_extension("cogs.seguranca")
             await self.load_extension("cogs.membros")
+            await self.load_extension("cogs.atendimento") # <--- NOVO MÓDULO AQUI
             print("✅ Módulos carregados com sucesso.")
         except Exception as e:
             print(f"❌ Erro ao carregar módulos: {e}")
@@ -144,7 +145,7 @@ async def on_ready():
 async def ajuda(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🌊 Central de Ajuda: Surf Trama",
-        description="Use os comandos `/` para interagir.\n\n**Módulos Ativos:** Moderação, Suporte, Segurança, Membros.",
+        description="Use os comandos `/` para interagir.\n\n**Módulos Ativos:** Moderação, Suporte, Segurança, Membros e Atendimento.",
         color=bot.COR_TRAMA
     )
     await interaction.response.send_message(embed=embed, ephemeral=True)
