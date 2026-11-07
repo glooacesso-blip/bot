@@ -3,3 +3,4 @@ flask
 instagrapi
 tweepy
 twitchAPI
+aiohttp
