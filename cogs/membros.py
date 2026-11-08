@@ -11,7 +11,7 @@ class Membros(commands.Cog):
         self.conn = sqlite3.connect('tickets.db')
         self.cursor = self.conn.cursor()
         
-        # Tabelas
+        # Tabelas já existentes
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS reaction_roles (
                 message_id TEXT, emoji TEXT, role_id TEXT, guild_id TEXT
@@ -22,32 +22,20 @@ class Membros(commands.Cog):
                 guild_id TEXT, palavra TEXT, role_id TEXT
             )
         ''')
-        # Tabela para a Portaria
+        
+        # Tabela da Portaria (adicionando coluna cargo_automatico)
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS portaria_config (
                 guild_id TEXT PRIMARY KEY,
                 channel_id TEXT,
                 imagem_url TEXT,
-                texto_custom TEXT
+                texto_custom TEXT,
+                cargo_automatico TEXT
             )
         ''')
         self.conn.commit()
         
         self.update_counters.start()
-
-    # ==========================================
-    # COMANDO: /limpar
-    # ==========================================
-    @app_commands.command(name="limpar", description="Apaga mensagens em massa do canal.")
-    @app_commands.describe(quantidade="Número de mensagens para apagar (1-100)")
-    @app_commands.checks.has_permissions(manage_messages=True)
-    async def limpar(self, interaction: discord.Interaction, quantidade: int):
-        if quantidade < 1 or quantidade > 100:
-            await interaction.response.send_message("❌ A quantidade deve ser entre 1 e 100.", ephemeral=True)
-            return
-        await interaction.response.defer(ephemeral=True)
-        deleted = await interaction.channel.purge(limit=quantidade)
-        await interaction.followup.send(f"✅ `{len(deleted)}` mensagens foram apagadas.", ephemeral=True)
 
     # ==========================================
     # GRUPO DE COMANDOS: /portaria
@@ -62,7 +50,7 @@ class Membros(commands.Cog):
         self.conn.commit()
         await interaction.response.send_message(f"✅ Canal de boas-vindas definido para {canal.mention}.", ephemeral=True)
 
-    @portaria_group.command(name="imagem", description="Define a imagem (banner) que aparece na mensagem de boas-vindas.")
+    @portaria_group.command(name="imagem", description="Define a imagem do banner de boas-vindas.")
     @app_commands.checks.has_permissions(administrator=True)
     async def portaria_imagem(self, interaction: discord.Interaction, link_imagem: str):
         self.cursor.execute("INSERT OR IGNORE INTO portaria_config (guild_id) VALUES (?)", (str(interaction.guild_id),))
@@ -70,7 +58,7 @@ class Membros(commands.Cog):
         self.conn.commit()
         await interaction.response.send_message("✅ Imagem de boas-vindas atualizada!", ephemeral=True)
 
-    @portaria_group.command(name="texto", description="Define o texto personalizado da mensagem de boas-vindas.")
+    @portaria_group.command(name="texto", description="Define o texto personalizado das boas-vindas.")
     @app_commands.checks.has_permissions(administrator=True)
     async def portaria_texto(self, interaction: discord.Interaction, texto: str):
         self.cursor.execute("INSERT OR IGNORE INTO portaria_config (guild_id) VALUES (?)", (str(interaction.guild_id),))
@@ -78,48 +66,66 @@ class Membros(commands.Cog):
         self.conn.commit()
         await interaction.response.send_message("✅ Texto de boas-vindas atualizado!", ephemeral=True)
 
-    # Evento de entrada de membro
+    # --- NOVO COMANDO: CARGO AUTOMÁTICO ---
+    @portaria_group.command(name="cargo-automatico", description="Define o cargo que todo novo membro vai receber ao entrar.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def portaria_cargo_automatico(self, interaction: discord.Interaction, cargo: discord.Role):
+        self.cursor.execute("INSERT OR IGNORE INTO portaria_config (guild_id) VALUES (?)", (str(interaction.guild_id),))
+        self.cursor.execute("UPDATE portaria_config SET cargo_automatico = ? WHERE guild_id = ?", (str(cargo.id), str(interaction.guild_id)))
+        self.conn.commit()
+        await interaction.response.send_message(f"✅ Todo novo membro receberá o cargo {cargo.mention} automaticamente ao entrar.", ephemeral=True)
+
+
+    # ==========================================
+    # EVENTO: NOVO MEMBRO ENTROU
+    # ==========================================
     @commands.Cog.listener()
     async def on_member_join(self, member):
         guild = member.guild
-        self.cursor.execute("SELECT channel_id, imagem_url, texto_custom FROM portaria_config WHERE guild_id = ?", (str(guild.id),))
+        
+        # Busca as configurações
+        self.cursor.execute("SELECT channel_id, imagem_url, texto_custom, cargo_automatico FROM portaria_config WHERE guild_id = ?", (str(guild.id),))
         result = self.cursor.fetchone()
         
-        if not result or not result[0]:
+        if not result:
             return
             
-        canal_id, imagem_url, texto_custom = result
-        canal = guild.get_channel(int(canal_id))
-        if not canal: return
+        canal_id, imagem_url, texto_custom, cargo_auto_id = result
 
-        texto = texto_custom if texto_custom else f"Olá {member.mention}, estamos muito felizes em ter você aqui!\n\nLeia as regras, pegue seus cargos e divirta-se."
+        # 1. DAR O CARGO AUTOMÁTICO
+        if cargo_auto_id:
+            cargo = guild.get_role(int(cargo_auto_id))
+            if cargo:
+                try:
+                    await member.add_roles(cargo)
+                except discord.Forbidden:
+                    print(f"Não foi possível dar o cargo automático para {member.name}. Verifique a hierarquia.")
 
-        embed = discord.Embed(
-            title="🌊 Bem-vindo(a) à TRAMA!",
-            description=texto,
-            color=self.bot.COR_TRAMA
-        )
-        
-        if imagem_url:
-            embed.set_image(url=imagem_url)
-        else:
-            embed.set_thumbnail(url=member.display_avatar.url)
-            
-        embed.set_footer(text="Surf Trama • Comunidade")
-        embed.timestamp = discord.utils.utcnow()
-
-        try:
-            await canal.send(content=member.mention, embed=embed)
-        except discord.Forbidden:
-            pass
-
-        try:
-            await member.send(embed=embed)
-        except discord.Forbidden:
-            pass
+        # 2. ENVIAR MENSAGEM DE BOAS-VINDAS
+        if canal_id:
+            canal = guild.get_channel(int(canal_id))
+            if canal:
+                texto = texto_custom if texto_custom else f"Olá {member.mention}, seja bem-vindo(a) à TRAMA!"
+                embed = discord.Embed(title="🌊 Bem-vindo(a) à TRAMA!", description=texto, color=self.bot.COR_TRAMA)
+                
+                if imagem_url:
+                    embed.set_image(url=imagem_url)
+                else:
+                    embed.set_thumbnail(url=member.display_avatar.url)
+                
+                try:
+                    await canal.send(content=member.mention, embed=embed)
+                except discord.Forbidden:
+                    pass
+                
+                # Tenta mandar no privado também
+                try:
+                    await member.send(embed=embed)
+                except discord.Forbidden:
+                    pass
 
     # ==========================================
-    # COMANDO: /cargos
+    # COMANDOS DE CARGO (Já existentes)
     # ==========================================
     @app_commands.command(name="cargos", description="Lista todos os cargos do servidor.")
     async def cargos(self, interaction: discord.Interaction):
@@ -128,9 +134,6 @@ class Membros(commands.Cog):
         if len(lista) > 4000: lista = lista[:4000] + "..."
         await interaction.response.send_message(embed=discord.Embed(title="📋 Cargos", description=lista, color=self.bot.COR_TRAMA), ephemeral=True)
 
-    # ==========================================
-    # COMANDO: /cargo-reacao
-    # ==========================================
     @app_commands.command(name="cargo-reacao", description="Cria uma mensagem para ganhar cargos por reação.")
     @app_commands.checks.has_permissions(administrator=True)
     async def cargo_reacao(self, interaction: discord.Interaction, cargo: discord.Role, emoji: str, texto: str):
@@ -141,9 +144,6 @@ class Membros(commands.Cog):
         self.cursor.execute("INSERT INTO reaction_roles VALUES (?, ?, ?, ?)", (str(mensagem.id), str(emoji), str(cargo.id), str(interaction.guild_id)))
         self.conn.commit()
 
-    # ==========================================
-    # COMANDO: /cargo-massa
-    # ==========================================
     @app_commands.command(name="cargo-massa", description="Adiciona ou remove um cargo de todos.")
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.choices(acao=[app_commands.Choice(name="Adicionar", value="add"), app_commands.Choice(name="Remover", value="remove")])
@@ -161,15 +161,10 @@ class Membros(commands.Cog):
             except: pass
         await interaction.followup.send(f"✅ Cargo alterado para **{count}** membros.")
 
-    # ==========================================
-    # COMANDO: /cargo-por-bio
-    # ==========================================
-    @app_commands.command(name="cargo-por-bio", description="Dá um cargo para quem tem uma palavra específica na bio.")
+    @app_commands.command(name="cargo-por-bio", description="Dá um cargo para quem tem uma palavra na bio.")
     @app_commands.checks.has_permissions(administrator=True)
     async def cargo_por_bio(self, interaction: discord.Interaction, palavra: str, cargo: discord.Role):
         await interaction.response.send_message(f"⏳ Lendo as bios...", ephemeral=True)
-        self.cursor.execute("INSERT INTO bio_roles VALUES (?, ?, ?)", (str(interaction.guild_id), palavra.lower(), str(cargo.id)))
-        self.conn.commit()
         count = 0
         async for membro in interaction.guild.fetch_members(limit=None):
             if membro.bot: continue
@@ -181,9 +176,6 @@ class Membros(commands.Cog):
             except: pass
         await interaction.followup.send(f"✅ **{count}** membros receberam o cargo {cargo.mention}.")
 
-    # ==========================================
-    # COMANDO: /primeira-dama
-    # ==========================================
     @app_commands.command(name="primeira-dama", description="Dá o cargo especial de destaque.")
     @app_commands.checks.has_permissions(administrator=True)
     async def primeira_dama(self, interaction: discord.Interaction, usuario: discord.Member):
@@ -191,13 +183,9 @@ class Membros(commands.Cog):
         if not cargo:
             cargo = await interaction.guild.create_role(name="👑 Primeira Dama", color=discord.Color.gold(), hoist=True)
         await usuario.add_roles(cargo)
-        embed = discord.Embed(title="👑 Nova Primeira Dama!", description=f"{usuario.mention} agora é a **Primeira Dama** da TRAMA!", color=discord.Color.gold())
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=discord.Embed(title="👑 Nova Primeira Dama!", description=f"{usuario.mention} agora é a **Primeira Dama** da TRAMA!", color=discord.Color.gold()))
 
-    # ==========================================
-    # COMANDO: /contadores
-    # ==========================================
-    @app_commands.command(name="contadores", description="Cria canais de voz que mostram a contagem do servidor.")
+    @app_commands.command(name="contadores", description="Cria canais de voz com contagem.")
     @app_commands.checks.has_permissions(administrator=True)
     async def contadores(self, interaction: discord.Interaction):
         guild = interaction.guild
@@ -206,8 +194,7 @@ class Membros(commands.Cog):
         await guild.create_voice_channel(f"👥 Membros: {guild.member_count}", category=cat)
         online = sum(1 for m in guild.members if m.status != discord.Status.offline)
         await guild.create_voice_channel(f"🟢 Online: {online}", category=cat)
-        for channel in cat.channels:
-            await channel.set_permissions(guild.default_role, connect=False)
+        for channel in cat.channels: await channel.set_permissions(guild.default_role, connect=False)
         await interaction.followup.send("✅ Canais criados!")
 
     @tasks.loop(minutes=10)
@@ -216,18 +203,14 @@ class Membros(commands.Cog):
             try:
                 membros_channel = discord.utils.get(guild.voice_channels, name=f"👥 Membros: {guild.member_count}")
                 online_count = sum(1 for m in guild.members if m.status != discord.Status.offline)
-                online_channel = discord.utils.get(guild.voice_channels, name=lambda c: c.startswith("🟢 Online:"))
-                if membros_channel:
-                    await membros_channel.edit(name=f"👥 Membros: {guild.member_count}")
+                if membros_channel: await membros_channel.edit(name=f"👥 Membros: {guild.member_count}")
                 for channel in guild.voice_channels:
                     if channel.name.startswith("🟢 Online:"):
                         await channel.edit(name=f"🟢 Online: {online_count}")
                         break
             except: pass
 
-    # ==========================================
-    # EVENTOS DE REAÇÃO
-    # ==========================================
+    # Eventos de reação
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
         if payload.member.bot: return
