@@ -4,7 +4,6 @@ from discord.ext import commands
 import os
 import sqlite3
 import datetime
-import requests # <-- NOVO: Para chamar a API da Atenas
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -18,12 +17,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# --- CONFIGURAÇÃO DA ATENAS PAY ---
-# Substitua pela sua chave de API gerada no painel da Atenas Pay
-ATENAS_API_KEY = "SUA_API_KEY_AQUI" 
-ATENAS_API_URL = "https://atenaspay.com.br/api/pix/create"
-
-# --- TOKENS DE VENDA (Gerados após o pagamento) ---
+# --- TOKENS DE VENDA (Sistema de Licença do Bot) ---
 CHAVES_VALIDAS = [
     "TRAMA-2026-VIP1",
     "TRAMA-2026-VIP2",
@@ -61,6 +55,7 @@ def setup_database():
             token TEXT
         )
     ''')
+    # Cria o seu login de Admin
     cursor.execute("SELECT * FROM users WHERE username = 'surf157'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password_hash, token) VALUES (?, ?, ?)", 
@@ -71,7 +66,6 @@ def setup_database():
 setup_database()
 
 # --- HTML: PÁGINA INICIAL (LANDING PAGE) ---
-# (Mantido igual ao anterior, apenas o botão de compra aponta para /comprar)
 HTML_LANDING = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -322,64 +316,6 @@ def logout():
     logout_user()
     return redirect(url_for('landing'))
 
-# --- ROTA DE COMPRA (CRIA O PAGAMENTO NA ATENAS PAY) ---
-@app.route('/comprar')
-@login_required
-def comprar():
-    # 1. Cria a cobrança na Atenas Pay
-    payload = {
-        "amount": 29.90,
-        "external_id": str(current_user.id), # ID do usuário para identificar no webhook
-        "webhook_url": "https://seu-site.onrender.com/webhook" # URL do seu webhook
-    }
-    headers = {
-        "x-api-key": ATENAS_API_KEY,
-        "Content-Type": "application/json"
-    }
-    
-    try:
-        response = requests.post(ATENAS_API_URL, json=payload, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-        
-        # 2. Redireciona para a página de pagamento da Atenas (ou exibe o QR Code)
-        # A API da Atenas deve retornar um link para o checkout ou o código Pix.
-        # Ajuste conforme a resposta real da API.
-        payment_url = data.get("payment_url") # Supondo que a API retorne um link
-        if payment_url:
-            return redirect(payment_url)
-        else:
-            # Se retornar o QR Code, você pode exibir na tela.
-            return f"<h1>Pague com Pix</h1><p>Código: {data.get('qr_code')}</p>"
-            
-    except requests.exceptions.RequestException as e:
-        return f"Erro ao gerar pagamento: {e}", 500
-
-# --- ROTA DE WEBHOOK (RECEBE A CONFIRMAÇÃO DA ATENAS PAY) ---
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    data = request.json
-    # A Atenas Pay envia o external_id e o status no webhook.
-    # Verifique a documentação deles para o formato exato.
-    if data:
-        external_id = data.get("external_id")
-        status = data.get("status")
-        
-        if status == "paid" or status == "confirmed": # Ajuste o nome do status
-            # Gera um token único para o cliente
-            novo_token = f"TRAMA-2026-{external_id[:6].upper()}"
-            
-            # Atualiza o token do usuário no banco
-            conn = sqlite3.connect('tickets.db')
-            cursor = conn.cursor()
-            cursor.execute("UPDATE users SET token = ? WHERE id = ?", (novo_token, external_id))
-            conn.commit()
-            conn.close()
-            
-            CHAVES_VALIDAS.append(novo_token)
-            
-    return jsonify({"status": "ok"}), 200
-
 @app.route('/validar_token', methods=['POST'])
 @login_required
 def validar_token():
@@ -441,11 +377,17 @@ class SurfTramaBot(commands.Bot):
             await self.load_extension("cogs.utilitarios")
             await self.load_extension("cogs.automacao")
             await self.load_extension("cogs.vip")
+            await self.load_extension("cogs.pagamentos") # <--- NOVO MÓDULO DE PAGAMENTOS AQUI
             print("✅ Módulos carregados com sucesso.")
         except Exception as e:
             print(f"❌ ERRO AO CARREGAR MÓDULOS: {e}")
-        await self.tree.sync()
-        print("✅ Comandos sincronizados.")
+        
+        # Sincroniza os comandos com o Discord
+        try:
+            await self.tree.sync()
+            print("✅ Comandos sincronizados.")
+        except Exception as e:
+            print(f"❌ Erro ao sincronizar: {e}")
 
 bot = SurfTramaBot()
 
