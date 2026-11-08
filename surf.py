@@ -4,34 +4,72 @@ from discord.ext import commands
 import os
 import sqlite3
 import datetime
-from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session
+from flask import Flask, request, jsonify, render_template_string, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 from threading import Thread
 
 # --- Configuração do Servidor Web ---
 app = Flask(__name__)
-app.secret_key = 'chave_super_secreta_trama_2026' # Necessário para o login funcionar
+app.secret_key = 'chave_super_secreta_surf_trama_2026'
 
-# Configuração do Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# Usuário Admin (Você pode mudar aqui)
-ADMIN_USER = "surf157"
-ADMIN_PASS = "surf"
+# --- TOKEN DE VENDA (VOCÊ GERA ISSO PARA SEUS CLIENTES) ---
+# Formato: TRAMA-XXXX-XXXX
+CHAVES_VALIDAS = [
+    "TRAMA-2026-VIP1",
+    "TRAMA-2026-VIP2",
+    "TRAMA-2026-TESTE"
+]
 
 class User(UserMixin):
-    def __init__(self, id):
+    def __init__(self, id, username, token):
         self.id = id
+        self.username = username
+        self.token = token
 
 @login_manager.user_loader
 def load_user(user_id):
-    if user_id == ADMIN_USER:
-        return User(user_id)
+    conn = sqlite3.connect('tickets.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, token FROM users WHERE id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return User(id=row[0], username=row[1], token=row[2])
     return None
 
-# --- HTML DO SITE (DASHBOARD) ---
+# --- Configuração do Banco de Dados de Usuários ---
+def setup_database():
+    conn = sqlite3.connect('tickets.db')
+    cursor = conn.cursor()
+    
+    # Tabela de Usuários (Clientes)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password_hash TEXT,
+            token TEXT
+        )
+    ''')
+    
+    # Tabela do seu Admin Master (Caso queira gerenciar pelo site no futuro)
+    # Usuário: admin, Senha: admin123
+    cursor.execute("SELECT * FROM users WHERE username = 'admin'")
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO users (username, password_hash, token) VALUES (?, ?, ?)", 
+                       ('admin', generate_password_hash('admin123'), 'MASTER-TOKEN'))
+                       
+    conn.commit()
+    conn.close()
+
+setup_database()
+
+# --- HTML: PÁGINA DE LOGIN ---
 HTML_LOGIN = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -39,77 +77,135 @@ HTML_LOGIN = """
     <meta charset="UTF-8">
     <title>Surf Trama | Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>body { background-color: #0a0a0a; color: #fff; font-family: sans-serif; }</style>
 </head>
-<body class="flex items-center justify-center h-screen">
+<body class="bg-[#0a0a0a] text-white flex items-center justify-center h-screen font-sans">
     <div class="bg-[#171717] p-8 rounded-xl border border-[#262626] w-96 shadow-2xl">
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-red-600">🌊 Surf Trama</h1>
-            <p class="text-gray-400 text-sm mt-2">Acesso Restrito à Administração</p>
-        </div>
+        <h1 class="text-3xl font-bold text-red-600 text-center mb-2">🌊 Surf Trama</h1>
+        <p class="text-gray-400 text-sm text-center mb-6">Entre na sua conta para gerenciar o bot.</p>
+        
         {% if error %}
-        <div class="bg-red-900/50 border border-red-500 text-red-300 p-3 rounded mb-4 text-sm text-center">
-            {{ error }}
-        </div>
+        <div class="bg-red-900/50 border border-red-500 text-red-300 p-2 rounded mb-4 text-sm text-center">{{ error }}</div>
         {% endif %}
+        
         <form method="POST" action="/login">
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-400 mb-2">Usuário</label>
-                <input type="text" name="username" class="w-full bg-[#0a0a0a] border border-[#333] rounded p-2 text-white focus:outline-none focus:border-red-500" required>
+                <label class="block text-sm text-gray-400 mb-1">Usuário</label>
+                <input type="text" name="username" class="w-full bg-[#0a0a0a] border border-[#333] rounded p-2 text-white focus:border-red-500 focus:outline-none" required>
             </div>
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-400 mb-2">Senha</label>
-                <input type="password" name="password" class="w-full bg-[#0a0a0a] border border-[#333] rounded p-2 text-white focus:outline-none focus:border-red-500" required>
+                <label class="block text-sm text-gray-400 mb-1">Senha</label>
+                <input type="password" name="password" class="w-full bg-[#0a0a0a] border border-[#333] rounded p-2 text-white focus:border-red-500 focus:outline-none" required>
             </div>
-            <button type="submit" class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition duration-200">
-                Entrar no Painel
-            </button>
+            <button type="submit" class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-2 rounded transition">Entrar</button>
         </form>
+        <p class="text-center text-sm text-gray-500 mt-4">Não tem conta? <a href="/cadastro" class="text-red-500 hover:underline">Cadastre-se</a></p>
     </div>
 </body>
 </html>
 """
 
+# --- HTML: PÁGINA DE CADASTRO ---
+HTML_CADASTRO = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Surf Trama | Cadastro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#0a0a0a] text-white flex items-center justify-center h-screen font-sans">
+    <div class="bg-[#171717] p-8 rounded-xl border border-[#262626] w-96 shadow-2xl">
+        <h1 class="text-3xl font-bold text-red-600 text-center mb-2">Criar Conta</h1>
+        <p class="text-gray-400 text-sm text-center mb-6">Crie sua conta para inserir seu token.</p>
+        
+        {% if error %}
+        <div class="bg-red-900/50 border border-red-500 text-red-300 p-2 rounded mb-4 text-sm text-center">{{ error }}</div>
+        {% endif %}
+        
+        <form method="POST" action="/cadastro">
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 mb-1">Usuário</label>
+                <input type="text" name="username" class="w-full bg-[#0a0a0a] border border-[#333] rounded p-2 text-white focus:border-red-500 focus:outline-none" required>
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm text-gray-400 mb-1">Senha</label>
+                <input type="password" name="password" class="w-full bg-[#0a0a0a] border border-[#333] rounded p-2 text-white focus:border-red-500 focus:outline-none" required>
+            </div>
+            <button type="submit" class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-2 rounded transition">Criar Conta</button>
+        </form>
+        <p class="text-center text-sm text-gray-500 mt-4">Já tem conta? <a href="/login" class="text-red-500 hover:underline">Faça Login</a></p>
+    </div>
+</body>
+</html>
+"""
+
+# --- HTML: PÁGINA DE VENDAS (BLOQUEIO SEM TOKEN) ---
+HTML_VENDAS = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Surf Trama | Adquirir Acesso</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#0a0a0a] text-white flex items-center justify-center h-screen font-sans">
+    <div class="bg-[#171717] p-10 rounded-xl border border-[#262626] w-[500px] text-center shadow-2xl">
+        <h1 class="text-4xl font-bold text-red-600 mb-2">Acesso Bloqueado</h1>
+        <p class="text-gray-400 mb-6">Você ainda não possui um Token de Licença ativo para acessar a Dashboard.</p>
+        
+        <div class="bg-[#0a0a0a] p-4 rounded-lg border border-[#333] mb-6">
+            <h2 class="text-xl font-bold text-white mb-2">Adquira o Bot Agora</h2>
+            <p class="text-sm text-gray-400 mb-4">Tenha acesso total ao Surf Trama, o melhor bot de gerenciamento para o seu servidor.</p>
+            <a href="https://discord.gg/seu_link_de_vendas" target="_blank" class="block w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition">Comprar Token no Discord</a>
+        </div>
+
+        <form method="POST" action="/validar_token">
+            <p class="text-sm text-gray-400 mb-2">Já comprou? Insira seu Token aqui:</p>
+            <input type="text" name="token" placeholder="TRAMA-XXXX-XXXX" class="w-full bg-[#0a0a0a] border border-[#333] rounded p-2 text-white text-center focus:border-red-500 focus:outline-none mb-4 uppercase" required>
+            <button type="submit" class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-2 rounded transition">Ativar Token</button>
+        </form>
+        
+        <a href="/logout" class="block mt-4 text-sm text-gray-500 hover:text-white">Sair da Conta</a>
+    </div>
+</body>
+</html>
+"""
+
+# --- HTML: DASHBOARD ---
 HTML_DASHBOARD = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surf Trama | Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #e5e7eb; }
         .card { background-color: #171717; border: 1px solid #262626; border-radius: 12px; padding: 20px; transition: 0.2s; }
-        .card:hover { border-color: #8B0000; transform: translateY(-2px); }
-        .stat-value { font-size: 28px; font-weight: 600; color: #fff; }
-        .stat-label { font-size: 13px; color: #a3a3a3; }
+        .card:hover { border-color: #8B0000; }
         .server-icon { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #262626; }
     </style>
 </head>
 <body class="p-8">
     <div class="max-w-6xl mx-auto">
-        <!-- Header -->
         <div class="flex justify-between items-center mb-10 pb-6 border-b border-[#262626]">
             <div class="flex items-center gap-4">
                 <div class="w-12 h-12 rounded-full bg-red-700 flex items-center justify-center font-bold text-white text-xl">T</div>
                 <div>
                     <h1 class="text-2xl font-bold text-white">Surf Trama Dashboard</h1>
-                    <p class="text-sm text-gray-400">Bem-vindo, Administrador</p>
+                    <p class="text-sm text-gray-400">Bem-vindo, {{ current_user.username }}</p>
                 </div>
             </div>
-            <a href="/logout" class="bg-[#262626] hover:bg-red-900 text-white px-4 py-2 rounded-lg text-sm transition">Sair do Painel</a>
+            <a href="/logout" class="bg-[#262626] hover:bg-red-900 text-white px-4 py-2 rounded-lg text-sm transition">Sair</a>
         </div>
 
-        <!-- Servidores -->
-        <h2 class="text-xl font-semibold text-white mb-4">📡 Servidores Conectados ({{ guilds|length }})</h2>
+        <h2 class="text-xl font-semibold text-white mb-4">📡 Seus Servidores ({{ guilds|length }})</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
             {% for guild in guilds %}
             <div class="card">
                 <div class="flex items-center gap-4 mb-4">
                     {% if guild.icon %}
-                        <img src="{{ guild.icon }}" alt="Logo" class="server-icon">
+                        <img src="{{ guild.icon }}" class="server-icon">
                     {% else %}
                         <div class="server-icon bg-gray-700 flex items-center justify-center text-xs">TRAMA</div>
                     {% endif %}
@@ -118,15 +214,14 @@ HTML_DASHBOARD = """
                         <p class="text-xs text-gray-500">ID: {{ guild.id }}</p>
                     </div>
                 </div>
-                
-                <div class="grid grid-cols-2 gap-4 mt-4">
+                <div class="grid grid-cols-2 gap-4">
                     <div class="bg-[#0a0a0a] p-3 rounded-lg text-center border border-[#262626]">
-                        <p class="stat-label">👥 Membros</p>
-                        <p class="stat-value">{{ guild.members }}</p>
+                        <p class="text-xs text-gray-400">👥 Membros</p>
+                        <p class="text-2xl font-bold text-white">{{ guild.members }}</p>
                     </div>
                     <div class="bg-[#0a0a0a] p-3 rounded-lg text-center border border-[#262626]">
-                        <p class="stat-label">🎧 Em Call</p>
-                        <p class="stat-value text-green-500">{{ guild.in_call }}</p>
+                        <p class="text-xs text-gray-400">🎧 Em Call</p>
+                        <p class="text-2xl font-bold text-green-500">{{ guild.in_call }}</p>
                     </div>
                 </div>
             </div>
@@ -136,41 +231,27 @@ HTML_DASHBOARD = """
             </div>
             {% endfor %}
         </div>
-
-        <!-- Status do Bot -->
-        <div class="card bg-gradient-to-r from-[#171717] to-[#1a0000]">
-            <h3 class="text-white font-semibold mb-2">🤖 Status do Bot</h3>
-            <p class="text-sm text-gray-400">O bot está online e operando em {{ guilds|length }} servidor(es).</p>
-            <div class="mt-4 flex gap-2">
-                <span class="bg-green-900/50 text-green-400 text-xs px-2 py-1 rounded border border-green-800">Online</span>
-                <span class="bg-gray-800 text-gray-300 text-xs px-2 py-1 rounded">Versão 2.0</span>
-            </div>
-        </div>
     </div>
 </body>
 </html>
 """
 
-# --- Configuração do Banco de Dados ---
-def setup_database():
-    conn = sqlite3.connect('tickets.db')
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS estatisticas_mensagens (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, guild_id TEXT, guild_name TEXT, data TEXT)''')
-    cursor.execute('''CREATE TABLE IF NOT EXISTS estatisticas_call (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, guild_id TEXT, channel_name TEXT, tempo_segundos INTEGER, data TEXT)''')
-    conn.commit()
-    conn.close()
+# --- ROTAS DO SITE ---
 
-setup_database()
-
-# --- Rotas do Site ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         
-        if username == ADMIN_USER and password == ADMIN_PASS:
-            user = User(username)
+        conn = sqlite3.connect('tickets.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, password_hash, token FROM users WHERE username = ?", (username,))
+        user_data = cursor.fetchone()
+        conn.close()
+        
+        if user_data and check_password_hash(user_data[2], password):
+            user = User(id=user_data[0], username=user_data[1], token=user_data[3])
             login_user(user)
             return redirect(url_for('dashboard'))
         else:
@@ -178,22 +259,63 @@ def login():
             
     return render_template_string(HTML_LOGIN)
 
+@app.route('/cadastro', methods=['GET', 'POST'])
+def cadastro():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        conn = sqlite3.connect('tickets.db')
+        cursor = conn.cursor()
+        try:
+            cursor.execute("INSERT INTO users (username, password_hash, token) VALUES (?, ?, ?)", 
+                           (username, generate_password_hash(password), None))
+            conn.commit()
+            conn.close()
+            return redirect(url_for('login'))
+        except sqlite3.IntegrityError:
+            conn.close()
+            return render_template_string(HTML_CADASTRO, error="Este nome de usuário já existe.")
+            
+    return render_template_string(HTML_CADASTRO)
+
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('login'))
 
+@app.route('/validar_token', methods=['POST'])
+@login_required
+def validar_token():
+    token = request.form.get('token').upper()
+    
+    if token in CHAVES_VALIDAS:
+        conn = sqlite3.connect('tickets.db')
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET token = ? WHERE id = ?", (token, current_user.id))
+        conn.commit()
+        conn.close()
+        
+        # Remove o token da lista de válidos para não ser usado duas vezes
+        CHAVES_VALIDAS.remove(token)
+        
+        return redirect(url_for('dashboard'))
+    else:
+        return render_template_string(HTML_VENDAS, error="Token inválido ou já utilizado.")
+
 @app.route('/')
 @login_required
 def dashboard():
+    # Se o cliente não tiver um token, manda para a tela de vendas
+    if not current_user.token:
+        return render_template_string(HTML_VENDAS)
+        
     if not bot.is_ready(): return "Iniciando bot... Recarregue em 10 segundos.", 200
     
     guilds_data = []
     for guild in bot.guilds:
-        # Conta quantos estão em call (voice)
         in_call = sum(1 for member in guild.members if member.voice and member.voice.channel)
-        
         guilds_data.append({
             "id": guild.id,
             "name": guild.name,
@@ -202,15 +324,8 @@ def dashboard():
             "in_call": in_call
         })
     
-    # Ordena pelo servidor com mais membros
     guilds_data.sort(key=lambda x: x['members'], reverse=True)
-    
     return render_template_string(HTML_DASHBOARD, guilds=guilds_data)
-
-@app.route('/sair')
-@login_required
-def sair_servidor():
-    os._exit(0)
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
@@ -254,41 +369,15 @@ bot = SurfTramaBot()
 
 @bot.event
 async def on_ready():
-    print(f'✅ Surf Trama v2.0 online como {bot.user}')
-    await bot.change_presence(status=discord.Status.online, activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda"))
+    print(f'✅ Surf Trama online como {bot.user}')
 
 @bot.event
 async def on_message(message):
-    if not message.author.bot and message.guild:
-        conn = sqlite3.connect('tickets.db')
-        cursor = conn.cursor()
-        agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute("INSERT INTO estatisticas_mensagens (user_id, guild_id, guild_name, data) VALUES (?, ?, ?, ?)", 
-                       (str(message.author.id), str(message.guild.id), message.guild.name, agora))
-        conn.commit()
-        conn.close()
-    
     await bot.process_commands(message)
-
-@bot.event
-async def on_voice_state_update(member, before, after):
-    if before.channel is None and after.channel is not None:
-        bot.call_timers[member.id] = datetime.datetime.now()
-    elif before.channel is not None and after.channel is None:
-        if member.id in bot.call_timers:
-            entrada = bot.call_timers.pop(member.id)
-            tempo = (datetime.datetime.now() - entrada).total_seconds()
-            conn = sqlite3.connect('tickets.db')
-            cursor = conn.cursor()
-            agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            cursor.execute("INSERT INTO estatisticas_call (user_id, guild_id, channel_name, tempo_segundos, data) VALUES (?, ?, ?, ?, ?)", 
-                           (str(member.id), str(member.guild.id), before.channel.name, int(tempo), agora))
-            conn.commit()
-            conn.close()
 
 @bot.tree.command(name="ajuda", description="Mostra o painel de ajuda do Surf Trama")
 async def ajuda(interaction: discord.Interaction):
-    embed = discord.Embed(title="🌊 Central de Ajuda: Surf Trama", description="Use os comandos `/` para interagir.", color=bot.COR_TRAMA)
+    embed = discord.Embed(title="🌊 Ajuda: Surf Trama", description="Use os comandos `/` para interagir.", color=bot.COR_TRAMA)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 if __name__ == "__main__":
