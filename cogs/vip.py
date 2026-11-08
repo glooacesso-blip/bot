@@ -24,10 +24,6 @@ class VIP(commands.Cog):
 
     @vip_group.command(name="painel", description="Cria o painel de vendas do VIP no canal.")
     @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(
-        imagem="Link do banner do VIP (Opcional)",
-        texto="Texto explicativo sobre os benefícios do VIP"
-    )
     async def vip_painel(self, interaction: discord.Interaction, imagem: str = None, texto: str = "Adquira o VIP e tenha benefícios exclusivos no servidor!"):
         embed = discord.Embed(
             title="💎 Torne-se VIP na TRAMA!",
@@ -44,7 +40,6 @@ class VIP(commands.Cog):
 
     @vip_group.command(name="adicionar", description="Adiciona o VIP a um usuário.")
     @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(usuario="Quem vai receber o VIP", dias="Quantos dias de VIP")
     async def vip_adicionar(self, interaction: discord.Interaction, usuario: discord.Member, dias: int):
         expiracao = datetime.datetime.now() + datetime.timedelta(days=dias)
         expiracao_str = expiracao.strftime("%d/%m/%Y")
@@ -85,7 +80,6 @@ class VIP(commands.Cog):
             await interaction.response.send_message(embed=embed, ephemeral=True)
         else:
             await interaction.response.send_message(f"❌ {usuario.mention} não é VIP.", ephemeral=True)
-
 
 # --- BOTÃO DE COMPRAR VIP ---
 class BotaoComprarVIP(discord.ui.View):
