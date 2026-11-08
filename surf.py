@@ -394,7 +394,11 @@ bot = SurfTramaBot()
 @bot.event
 async def on_ready():
     print(f'✅ Surf Trama online como {bot.user}')
-    await bot.change_presence(status=discord.Status.online, activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda"))
+    keep_alive()
+
+@bot.event
+async def on_message(message):
+    await bot.process_commands(message)
 
 @bot.tree.command(name="ajuda", description="Mostra o painel de ajuda do Surf Trama")
 async def ajuda(interaction: discord.Interaction):
@@ -406,7 +410,4 @@ if __name__ == "__main__":
     if not TOKEN:
         print("⚠️ Defina a variável DISCORD_TOKEN no painel do Render.")
     else:
-        # Inicia o servidor web em uma thread separada ANTES do bot
-        keep_alive()
-        # Inicia o bot
         bot.run(TOKEN)
