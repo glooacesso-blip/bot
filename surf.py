@@ -17,7 +17,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# --- TOKENS DE VENDA (CLIENTES) ---
+# --- TOKENS DE VENDA ---
 CHAVES_VALIDAS = [
     "TRAMA-2026-VIP1",
     "TRAMA-2026-VIP2",
@@ -39,7 +39,6 @@ def load_user(user_id):
     row = cursor.fetchone()
     conn.close()
     if row:
-        # Se for o seu usuário, define como admin
         is_admin = (row[1] == 'surf157')
         return User(id=row[0], username=row[1], token=row[2], is_admin=is_admin)
     return None
@@ -48,7 +47,6 @@ def load_user(user_id):
 def setup_database():
     conn = sqlite3.connect('tickets.db')
     cursor = conn.cursor()
-    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,17 +55,139 @@ def setup_database():
             token TEXT
         )
     ''')
-    
-    # CRIA O SEU LOGIN DE ADMIN AQUI
     cursor.execute("SELECT * FROM users WHERE username = 'surf157'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password_hash, token) VALUES (?, ?, ?)", 
                        ('surf157', generate_password_hash('surf'), 'ADMIN-MASTER-TOKEN'))
-                       
     conn.commit()
     conn.close()
 
 setup_database()
+
+# --- HTML: PÁGINA INICIAL (LANDING PAGE) ---
+HTML_LANDING = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surf Trama | O Melhor Bot para o seu Servidor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #e5e7eb; scroll-behavior: smooth; }
+        .hero-bg { background: radial-gradient(circle at center, #1a0000 0%, #0a0a0a 100%); }
+        .card { background-color: #171717; border: 1px solid #262626; border-radius: 12px; padding: 24px; transition: 0.3s; }
+        .card:hover { border-color: #8B0000; transform: translateY(-5px); }
+        .gradient-text { background: linear-gradient(to right, #ff3333, #8B0000); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="flex justify-between items-center p-6 border-b border-[#262626] bg-[#0a0a0a]/90 backdrop-blur sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-red-700 flex items-center justify-center font-bold text-white">T</div>
+            <span class="text-xl font-bold text-white">Surf Trama</span>
+        </div>
+        <div class="flex gap-4">
+            <a href="/login" class="bg-red-700 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition">Entrar / Cadastrar</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero-bg py-24 px-6 text-center border-b border-[#262626]">
+        <h1 class="text-5xl font-extrabold mb-4">Domine seu servidor com o <br><span class="gradient-text">Surf Trama</span></h1>
+        <p class="text-gray-400 text-lg max-w-2xl mx-auto mb-8">O bot definitivo de moderação, segurança, engajamento e vendas para a sua comunidade. Rápido, seguro e 100% personalizável.</p>
+        <a href="/login" class="bg-red-700 hover:bg-red-600 text-white px-8 py-3 rounded-lg font-bold text-lg transition shadow-lg shadow-red-900/50">Adicionar ao Discord</a>
+    </header>
+
+    <!-- Features (Comandos) -->
+    <section class="py-20 px-6 max-w-6xl mx-auto">
+        <h2 class="text-3xl font-bold text-center mb-12 text-white">Tudo o que você precisa em um só lugar</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Moderação -->
+            <div class="card">
+                <div class="text-4xl mb-4">🛡️</div>
+                <h3 class="text-xl font-bold text-white mb-2">Moderação e Segurança</h3>
+                <p class="text-sm text-gray-400">Anti-raid, anti-link, honeypot, sistema de warns, mute e ban automáticos. Mantenha o seu servidor seguro contra invasores.</p>
+            </div>
+            <!-- Suporte -->
+            <div class="card">
+                <div class="text-4xl mb-4">🎫</div>
+                <h3 class="text-xl font-bold text-white mb-2">Sistema de Tickets</h3>
+                <p class="text-sm text-gray-400">Atendimento profissional com menus suspensos, formulários personalizados e criação de canais privados.</p>
+            </div>
+            <!-- Membros -->
+            <div class="card">
+                <div class="text-4xl mb-4">👥</div>
+                <h3 class="text-xl font-bold text-white mb-2">Gestão de Membros</h3>
+                <p class="text-sm text-gray-400">Boas-vindas automáticas, cargos por reação, cargos por bio, contadores dinâmicos e sistema de primeira dama.</p>
+            </div>
+            <!-- Automação -->
+            <div class="card">
+                <div class="text-4xl mb-4">⚙️</div>
+                <h3 class="text-xl font-bold text-white mb-2">Automação Total</h3>
+                <p class="text-sm text-gray-400">Gatilhos personalizados, reações automáticas, mensagens agendadas e sorteios interativos.</p>
+            </div>
+            <!-- Social -->
+            <div class="card">
+                <div class="text-4xl mb-4">📱</div>
+                <h3 class="text-xl font-bold text-white mb-2">Redes Sociais</h3>
+                <p class="text-sm text-gray-400">Notificações de live na Twitch, downloads de vídeos e sistema de Tellonym para perguntas anônimas.</p>
+            </div>
+            <!-- Games -->
+            <div class="card">
+                <div class="text-4xl mb-4">🎮</div>
+                <h3 class="text-xl font-bold text-white mb-2">Integração com Jogos</h3>
+                <p class="text-sm text-gray-400">Tracker de Valorant, cargos de jogos e sistemas para comunidades gamers.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Depoimentos -->
+    <section class="py-20 bg-[#0f0f0f] border-t border-[#262626] px-6">
+        <h2 class="text-3xl font-bold text-center mb-12 text-white">O que dizem sobre nós</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            <div class="card bg-[#171717]">
+                <p class="text-gray-300 italic mb-4">"O melhor bot que já usei. O sistema de segurança salvou meu servidor de um ataque de raid. Recomendo demais!"</p>
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">D</div>
+                    <div>
+                        <p class="text-white text-sm font-bold">dono_do_servidor</p>
+                        <p class="text-xs text-green-500">Cliente Verificado</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card bg-[#171717]">
+                <p class="text-gray-300 italic mb-4">"A dashboard é incrível, consigo ver tudo o que acontece no meu servidor em tempo real. Vale cada centavo."</p>
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold">M</div>
+                    <div>
+                        <p class="text-white text-sm font-bold">maria_gamer</p>
+                        <p class="text-xs text-green-500">Cliente Verificado</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card bg-[#171717]">
+                <p class="text-gray-300 italic mb-4">"Os tickets com menu são muito profissionais. Meus membros adoraram o sistema de atendimento."</p>
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center text-xs font-bold">J</div>
+                    <div>
+                        <p class="text-white text-sm font-bold">joao_trama</p>
+                        <p class="text-xs text-green-500">Cliente Verificado</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="text-center py-8 text-gray-500 text-sm border-t border-[#262626]">
+        <p>&copy; 2026 Surf Trama. Todos os direitos reservados.</p>
+    </footer>
+</body>
+</html>
+"""
 
 # --- HTML: PÁGINA DE LOGIN ---
 HTML_LOGIN = """
@@ -99,6 +219,7 @@ HTML_LOGIN = """
             <button type="submit" class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-2 rounded transition">Entrar</button>
         </form>
         <p class="text-center text-sm text-gray-500 mt-4">É cliente novo? <a href="/cadastro" class="text-red-500 hover:underline">Cadastre-se</a></p>
+        <p class="text-center text-sm text-gray-500 mt-2"><a href="/" class="text-gray-400 hover:underline">Voltar para o início</a></p>
     </div>
 </body>
 </html>
@@ -164,7 +285,6 @@ HTML_VENDAS = """
             <input type="text" name="token" placeholder="TRAMA-XXXX-XXXX" class="w-full bg-[#0a0a0a] border border-[#333] rounded p-2 text-white text-center focus:border-red-500 focus:outline-none mb-4 uppercase" required>
             <button type="submit" class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-2 rounded transition">Ativar Token</button>
         </form>
-        
         <a href="/logout" class="block mt-4 text-sm text-gray-500 hover:text-white">Sair da Conta</a>
     </div>
 </body>
@@ -238,8 +358,15 @@ HTML_DASHBOARD = """
 
 # --- ROTAS DO SITE ---
 
+@app.route('/')
+def landing():
+    return render_template_string(HTML_LANDING)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+        
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -265,7 +392,6 @@ def cadastro():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        # Impede que alguém se cadastre como 'surf157'
         if username == 'surf157':
             return render_template_string(HTML_CADASTRO, error="Este nome de usuário é reservado.")
         
@@ -287,7 +413,7 @@ def cadastro():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('login'))
+    return redirect(url_for('landing'))
 
 @app.route('/validar_token', methods=['POST'])
 @login_required
@@ -306,10 +432,9 @@ def validar_token():
     else:
         return render_template_string(HTML_VENDAS, error="Token inválido ou já utilizado.")
 
-@app.route('/')
+@app.route('/dashboard')
 @login_required
 def dashboard():
-    # SE FOR ADMIN, PULA A TELA DE VENDAS
     if not current_user.token and not current_user.is_admin:
         return render_template_string(HTML_VENDAS)
         
