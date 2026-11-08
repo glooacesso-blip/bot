@@ -11,9 +11,6 @@ class Pagamentos(commands.Cog):
         self.conn = sqlite3.connect('tickets.db')
         self.cursor = self.conn.cursor()
         
-        # Configuração da Atenas Pay
-        self.cursor.execute('''CREATE TABLE IF NOT EXISTS gateway_config (guild_id TEXT PRIMARY KEY, api_key TEXT)''')
-        
         # Configuração da SyncPay
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS syncpay_config (
@@ -34,12 +31,6 @@ class Pagamentos(commands.Cog):
             return {"titulo": row[0] or "💎 Torne-se VIP na TRAMA!", "desc": row[1] or "Adquira o VIP!", "msg_canal": row[2] or "Escolha seu plano:", "botao": row[3] or "Comprar VIP"}
         return {"titulo": "💎 Torne-se VIP na TRAMA!", "desc": "Adquira o VIP!", "msg_canal": "Escolha seu plano:", "botao": "Comprar VIP"}
 
-    # --- COMANDOS DE CONFIGURAÇÃO ---
-    @app_commands.command(name="configurar-pagamento", description="Configura a API Key da Atenas Pay.")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def configurar_pagamento(self, interaction: discord.Interaction):
-        await interaction.response.send_modal(ModalConfigurarAPI())
-
     @app_commands.command(name="configurar-syncpay", description="Configura as chaves (Public e Secret) da SyncPay.")
     @app_commands.checks.has_permissions(administrator=True)
     async def configurar_syncpay(self, interaction: discord.Interaction):
@@ -54,14 +45,9 @@ class Pagamentos(commands.Cog):
     @app_commands.command(name="painel-vip", description="Cria o painel de vendas.")
     @app_commands.checks.has_permissions(administrator=True)
     async def painel_vip(self, interaction: discord.Interaction, imagem: str = None):
-        # Verifica se pelo menos um gateway está configurado
-        self.cursor.execute("SELECT 1 FROM gateway_config WHERE guild_id = ?", (str(interaction.guild_id),))
-        atenas_ok = self.cursor.fetchone()
         self.cursor.execute("SELECT 1 FROM syncpay_config WHERE guild_id = ?", (str(interaction.guild_id),))
-        syncpay_ok = self.cursor.fetchone()
-
-        if not atenas_ok and not syncpay_ok:
-            await interaction.response.send_message("❌ Configure pelo menos um gateway (Atenas ou SyncPay) antes de criar o painel.", ephemeral=True)
+        if not self.cursor.fetchone():
+            await interaction.response.send_message("❌ Configure as chaves da SyncPay primeiro com `/configurar-syncpay`.", ephemeral=True)
             return
 
         textos = self.get_textos(interaction.guild_id)
@@ -71,24 +57,11 @@ class Pagamentos(commands.Cog):
         await interaction.response.send_message("Painel criado!", ephemeral=True)
         await interaction.channel.send(embed=embed, view=BotaoComprarVIP())
 
-    # --- FUNÇÕES DE PAGAMENTO ---
-    async def gerar_pix_atena(self, interaction: discord.Interaction, api_key: str, valor: float):
-        payload = {"amount": valor, "external_id": str(interaction.user.id), "webhook_url": "https://seu-site.onrender.com/webhook"}
-        headers = {"x-api-key": api_key, "Content-Type": "application/json"}
-        
-        try:
-            response = requests.post("https://atenaspay.com.br/api/pix/create", json=payload, headers=headers)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            print(f"Erro Atenas: {e}")
-            return None
-
     async def gerar_pix_syncpay(self, interaction: discord.Interaction, public_token: str, secret_token: str, valor: float):
-        # A SyncPay usa um endpoint diferente. Vamos tentar o padrão deles.
-        # A documentação não é pública, então usamos o padrão de mercado.
+        # URL baseada nos exemplos da comunidade: https://api.syncpay.pro/v1/gateway/api/
         url = "https://api.syncpay.pro/v1/gateway/api/pix/cashIn"
         
+        # Payload baseado na estrutura da biblioteca syncpay [citation:3][citation:5]
         payload = {
             "amount": valor,
             "client": {
@@ -99,9 +72,8 @@ class Pagamentos(commands.Cog):
             "webhook_url": "https://seu-site.onrender.com/webhook"
         }
         
-        # Na SyncPay, o Public Token geralmente vai no header e o Secret também.
-        # Alguns lugares usam Basic Auth, outros usam headers customizados.
-        # Vamos tentar o padrão mais comum para APIs de gateway.
+        # Headers: Vamos testar o padrão mais comum para APIs que usam Public/Secret
+        # Algumas usam Bearer, outras usam headers customizados. Vamos tentar o mais comum.
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {secret_token}",
@@ -122,19 +94,13 @@ class Pagamentos(commands.Cog):
         except Exception as e:
             print(f"Erro SyncPay: {e}")
             try:
-                await interaction.user.send(f"❌ **Erro SyncPay:**\n```{e}```")
+                # Tenta capturar a resposta de erro da API para mostrar no DM
+                erro_detalhado = e.response.text if hasattr(e, 'response') else str(e)
+                await interaction.user.send(f"❌ **Erro SyncPay:**\n```{erro_detalhado}```")
             except: pass
             return None
 
 # --- MODAIS ---
-class ModalConfigurarAPI(discord.ui.Modal, title="Configurar Atenas Pay"):
-    api_key = discord.ui.TextInput(label="API Key da Atenas Pay", placeholder="Cole sua chave...", required=True)
-    async def on_submit(self, interaction: discord.Interaction):
-        cog = interaction.client.get_cog("Pagamentos")
-        cog.cursor.execute("INSERT OR REPLACE INTO gateway_config VALUES (?, ?)", (str(interaction.guild_id), self.api_key.value))
-        cog.conn.commit()
-        await interaction.response.send_message("✅ API Key da Atenas configurada!", ephemeral=True)
-
 class ModalConfigurarSyncPay(discord.ui.Modal, title="Configurar SyncPay"):
     public_token = discord.ui.TextInput(label="Public Token", placeholder="Cole o Public Token aqui...", required=True)
     secret_token = discord.ui.TextInput(label="Secret Token", placeholder="Cole o Secret Token aqui...", required=True)
@@ -171,7 +137,7 @@ class ModalConfigurarMensagens(discord.ui.Modal, title="Personalizar Mensagens V
 class BotaoComprarVIP(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
 
-    @discord.ui.button(label="Comprar VIP", style=discord.ButtonStyle.success, emoji="💎", custom_id="btn_comprar_vip_v11")
+    @discord.ui.button(label="Comprar VIP", style=discord.ButtonStyle.success, emoji="💎", custom_id="btn_comprar_vip_v12")
     async def comprar(self, interaction: discord.Interaction, button: discord.ui.Button):
         cog = interaction.client.get_cog("Pagamentos")
         textos = cog.get_textos(interaction.guild_id)
@@ -197,48 +163,41 @@ class BotaoComprarVIP(discord.ui.View):
 class MenuPlanos(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
 
-    @discord.ui.button(label="VIP Básico - R$ 9,90", style=discord.ButtonStyle.secondary, emoji="🥉", custom_id="btn_plano_basico_v11")
+    @discord.ui.button(label="VIP Básico - R$ 9,90", style=discord.ButtonStyle.secondary, emoji="🥉", custom_id="btn_plano_basico_v12")
     async def plano_basico(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.processar_pagamento(interaction, 9.90, "Básico")
 
-    @discord.ui.button(label="VIP Premium - R$ 19,90", style=discord.ButtonStyle.primary, emoji="🥈", custom_id="btn_plano_premium_v11")
+    @discord.ui.button(label="VIP Premium - R$ 19,90", style=discord.ButtonStyle.primary, emoji="🥈", custom_id="btn_plano_premium_v12")
     async def plano_premium(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.processar_pagamento(interaction, 19.90, "Premium")
 
-    @discord.ui.button(label="VIP Master - R$ 29,90", style=discord.ButtonStyle.success, emoji="🥇", custom_id="btn_plano_master_v11")
+    @discord.ui.button(label="VIP Master - R$ 29,90", style=discord.ButtonStyle.success, emoji="🥇", custom_id="btn_plano_master_v12")
     async def plano_master(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.processar_pagamento(interaction, 29.90, "Master")
 
     async def processar_pagamento(self, interaction: discord.Interaction, valor: float, nome_plano: str):
         cog = interaction.client.get_cog("Pagamentos")
         
-        # Verifica qual gateway está configurado
-        cog.cursor.execute("SELECT api_key FROM gateway_config WHERE guild_id = ?", (str(interaction.guild_id),))
-        atenas = cog.cursor.fetchone()
         cog.cursor.execute("SELECT public_token, secret_token FROM syncpay_config WHERE guild_id = ?", (str(interaction.guild_id),))
         syncpay = cog.cursor.fetchone()
 
-        if not atenas and not syncpay:
-            await interaction.response.send_message("❌ Nenhum gateway configurado.", ephemeral=True)
+        if not syncpay:
+            await interaction.response.send_message("❌ Nenhum gateway SyncPay configurado.", ephemeral=True)
             return
 
         await interaction.response.defer()
         
-        # Prioriza a Atenas se estiver configurada, senão usa a SyncPay
-        if atenas:
-            dados_pix = await cog.gerar_pix_atena(interaction, atenas[0], valor)
-        else:
-            dados_pix = await cog.gerar_pix_syncpay(interaction, syncpay[0], syncpay[1], valor)
+        dados_pix = await cog.gerar_pix_syncpay(interaction, syncpay[0], syncpay[1], valor)
         
         if not dados_pix:
-            await interaction.followup.send("❌ Erro ao gerar o Pix. Verifique seu privado (DM) para ver o diagnóstico.")
+            await interaction.followup.send("❌ Erro ao gerar o Pix na SyncPay. Verifique seu privado (DM) para ver o diagnóstico.")
             return
 
         qr_code_texto = (
             dados_pix.get("qr_code") or dados_pix.get("pix_code") or dados_pix.get("emv") or 
             dados_pix.get("brcode") or dados_pix.get("code") or dados_pix.get("qrcode") or 
             dados_pix.get("pixCopiaECola") or dados_pix.get("copia_e_cola") or
-            "Código não encontrado."
+            "Código não encontrado. Verifique o DM."
         )
 
         qr_code_imagem = dados_pix.get("qr_code_image") or dados_pix.get("qr_code_url") or dados_pix.get("image_url") or dados_pix.get("qrCodeImage")
@@ -249,7 +208,7 @@ class MenuPlanos(discord.ui.View):
             color=discord.Color.gold()
         )
         if qr_code_imagem: embed.set_image(url=qr_code_imagem)
-        embed.set_footer(text="Método escolhido: Pix")
+        embed.set_footer(text="Método escolhido: Pix (SyncPay)")
         await interaction.followup.send(embed=embed)
 
 async def setup(bot):
