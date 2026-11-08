@@ -17,8 +17,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# --- TOKEN DE VENDA (VOCÊ GERA ISSO PARA SEUS CLIENTES) ---
-# Formato: TRAMA-XXXX-XXXX
+# --- TOKENS DE VENDA (CLIENTES) ---
 CHAVES_VALIDAS = [
     "TRAMA-2026-VIP1",
     "TRAMA-2026-VIP2",
@@ -26,10 +25,11 @@ CHAVES_VALIDAS = [
 ]
 
 class User(UserMixin):
-    def __init__(self, id, username, token):
+    def __init__(self, id, username, token, is_admin=False):
         self.id = id
         self.username = username
         self.token = token
+        self.is_admin = is_admin
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -39,15 +39,16 @@ def load_user(user_id):
     row = cursor.fetchone()
     conn.close()
     if row:
-        return User(id=row[0], username=row[1], token=row[2])
+        # Se for o seu usuário, define como admin
+        is_admin = (row[1] == 'surf157')
+        return User(id=row[0], username=row[1], token=row[2], is_admin=is_admin)
     return None
 
-# --- Configuração do Banco de Dados de Usuários ---
+# --- Configuração do Banco de Dados ---
 def setup_database():
     conn = sqlite3.connect('tickets.db')
     cursor = conn.cursor()
     
-    # Tabela de Usuários (Clientes)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,12 +58,11 @@ def setup_database():
         )
     ''')
     
-    # Tabela do seu Admin Master (Caso queira gerenciar pelo site no futuro)
-    # Usuário: admin, Senha: admin123
-    cursor.execute("SELECT * FROM users WHERE username = 'admin'")
+    # CRIA O SEU LOGIN DE ADMIN AQUI
+    cursor.execute("SELECT * FROM users WHERE username = 'surf157'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password_hash, token) VALUES (?, ?, ?)", 
-                       ('admin', generate_password_hash('admin123'), 'MASTER-TOKEN'))
+                       ('surf157', generate_password_hash('surf'), 'ADMIN-MASTER-TOKEN'))
                        
     conn.commit()
     conn.close()
@@ -81,7 +81,7 @@ HTML_LOGIN = """
 <body class="bg-[#0a0a0a] text-white flex items-center justify-center h-screen font-sans">
     <div class="bg-[#171717] p-8 rounded-xl border border-[#262626] w-96 shadow-2xl">
         <h1 class="text-3xl font-bold text-red-600 text-center mb-2">🌊 Surf Trama</h1>
-        <p class="text-gray-400 text-sm text-center mb-6">Entre na sua conta para gerenciar o bot.</p>
+        <p class="text-gray-400 text-sm text-center mb-6">Entre para gerenciar o bot.</p>
         
         {% if error %}
         <div class="bg-red-900/50 border border-red-500 text-red-300 p-2 rounded mb-4 text-sm text-center">{{ error }}</div>
@@ -98,7 +98,7 @@ HTML_LOGIN = """
             </div>
             <button type="submit" class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-2 rounded transition">Entrar</button>
         </form>
-        <p class="text-center text-sm text-gray-500 mt-4">Não tem conta? <a href="/cadastro" class="text-red-500 hover:underline">Cadastre-se</a></p>
+        <p class="text-center text-sm text-gray-500 mt-4">É cliente novo? <a href="/cadastro" class="text-red-500 hover:underline">Cadastre-se</a></p>
     </div>
 </body>
 </html>
@@ -139,7 +139,7 @@ HTML_CADASTRO = """
 </html>
 """
 
-# --- HTML: PÁGINA DE VENDAS (BLOQUEIO SEM TOKEN) ---
+# --- HTML: PÁGINA DE VENDAS ---
 HTML_VENDAS = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -155,7 +155,7 @@ HTML_VENDAS = """
         
         <div class="bg-[#0a0a0a] p-4 rounded-lg border border-[#333] mb-6">
             <h2 class="text-xl font-bold text-white mb-2">Adquira o Bot Agora</h2>
-            <p class="text-sm text-gray-400 mb-4">Tenha acesso total ao Surf Trama, o melhor bot de gerenciamento para o seu servidor.</p>
+            <p class="text-sm text-gray-400 mb-4">Tenha acesso total ao Surf Trama.</p>
             <a href="https://discord.gg/seu_link_de_vendas" target="_blank" class="block w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition">Comprar Token no Discord</a>
         </div>
 
@@ -193,13 +193,13 @@ HTML_DASHBOARD = """
                 <div class="w-12 h-12 rounded-full bg-red-700 flex items-center justify-center font-bold text-white text-xl">T</div>
                 <div>
                     <h1 class="text-2xl font-bold text-white">Surf Trama Dashboard</h1>
-                    <p class="text-sm text-gray-400">Bem-vindo, {{ current_user.username }}</p>
+                    <p class="text-sm text-gray-400">Bem-vindo, {{ current_user.username }} {% if current_user.is_admin %}(Admin){% endif %}</p>
                 </div>
             </div>
             <a href="/logout" class="bg-[#262626] hover:bg-red-900 text-white px-4 py-2 rounded-lg text-sm transition">Sair</a>
         </div>
 
-        <h2 class="text-xl font-semibold text-white mb-4">📡 Seus Servidores ({{ guilds|length }})</h2>
+        <h2 class="text-xl font-semibold text-white mb-4">📡 Servidores ({{ guilds|length }})</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
             {% for guild in guilds %}
             <div class="card">
@@ -251,7 +251,7 @@ def login():
         conn.close()
         
         if user_data and check_password_hash(user_data[2], password):
-            user = User(id=user_data[0], username=user_data[1], token=user_data[3])
+            user = User(id=user_data[0], username=user_data[1], token=user_data[3], is_admin=(user_data[1] == 'surf157'))
             login_user(user)
             return redirect(url_for('dashboard'))
         else:
@@ -264,6 +264,10 @@ def cadastro():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        
+        # Impede que alguém se cadastre como 'surf157'
+        if username == 'surf157':
+            return render_template_string(HTML_CADASTRO, error="Este nome de usuário é reservado.")
         
         conn = sqlite3.connect('tickets.db')
         cursor = conn.cursor()
@@ -297,9 +301,7 @@ def validar_token():
         conn.commit()
         conn.close()
         
-        # Remove o token da lista de válidos para não ser usado duas vezes
         CHAVES_VALIDAS.remove(token)
-        
         return redirect(url_for('dashboard'))
     else:
         return render_template_string(HTML_VENDAS, error="Token inválido ou já utilizado.")
@@ -307,8 +309,8 @@ def validar_token():
 @app.route('/')
 @login_required
 def dashboard():
-    # Se o cliente não tiver um token, manda para a tela de vendas
-    if not current_user.token:
+    # SE FOR ADMIN, PULA A TELA DE VENDAS
+    if not current_user.token and not current_user.is_admin:
         return render_template_string(HTML_VENDAS)
         
     if not bot.is_ready(): return "Iniciando bot... Recarregue em 10 segundos.", 200
@@ -346,7 +348,6 @@ class SurfTramaBot(commands.Bot):
         super().__init__(command_prefix='!', intents=intents)
         self.COR_TRAMA = 0x8B0000
         self.COR_PRETA = 0x000000
-        self.call_timers = {}
 
     async def setup_hook(self):
         try:
