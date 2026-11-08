@@ -5,3 +5,11 @@ instagrapi
 tweepy
 twitchAPI
 aiohttp
+discord.py
+flask
+flask-login
+instagrapi
+tweepy
+twitchAPI
+aiohttp
+werkzeug
