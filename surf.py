@@ -105,27 +105,27 @@ HTML_LANDING = """
             <div class="card">
                 <div class="text-4xl mb-4">🛡️</div>
                 <h3 class="text-xl font-bold text-white mb-2">Moderação e Segurança</h3>
-                <p class="text-sm text-gray-400">Anti-raid, anti-link, honeypot, sistema de warns, mute e ban automáticos. Mantenha o seu servidor seguro contra invasores.</p>
+                <p class="text-sm text-gray-400">Anti-raid, anti-link, honeypot, sistema de warns, mute e ban automáticos.</p>
             </div>
             <div class="card">
                 <div class="text-4xl mb-4">🎫</div>
                 <h3 class="text-xl font-bold text-white mb-2">Sistema de Tickets</h3>
-                <p class="text-sm text-gray-400">Atendimento profissional com menus suspensos, formulários personalizados e criação de canais privados.</p>
+                <p class="text-sm text-gray-400">Atendimento profissional com menus suspensos e formulários personalizados.</p>
             </div>
             <div class="card">
                 <div class="text-4xl mb-4">👥</div>
                 <h3 class="text-xl font-bold text-white mb-2">Gestão de Membros</h3>
-                <p class="text-sm text-gray-400">Boas-vindas automáticas, cargos por reação, cargos por bio, contadores dinâmicos e sistema de primeira dama.</p>
+                <p class="text-sm text-gray-400">Boas-vindas automáticas, cargos por reação, cargos por bio e contadores.</p>
             </div>
             <div class="card">
                 <div class="text-4xl mb-4">⚙️</div>
                 <h3 class="text-xl font-bold text-white mb-2">Automação Total</h3>
-                <p class="text-sm text-gray-400">Gatilhos personalizados, reações automáticas, mensagens agendadas e sorteios interativos.</p>
+                <p class="text-sm text-gray-400">Gatilhos personalizados, reações automáticas e sorteios interativos.</p>
             </div>
             <div class="card">
                 <div class="text-4xl mb-4">📱</div>
                 <h3 class="text-xl font-bold text-white mb-2">Redes Sociais</h3>
-                <p class="text-sm text-gray-400">Notificações de live na Twitch, downloads de vídeos e sistema de Tellonym para perguntas anônimas.</p>
+                <p class="text-sm text-gray-400">Notificações de live na Twitch, downloads de vídeos e sistema de Tellonym.</p>
             </div>
             <div class="card">
                 <div class="text-4xl mb-4">🎮</div>
@@ -139,7 +139,7 @@ HTML_LANDING = """
         <h2 class="text-3xl font-bold text-center mb-12 text-white">O que dizem sobre nós</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             <div class="card bg-[#171717]">
-                <p class="text-gray-300 italic mb-4">"O melhor bot que já usei. O sistema de segurança salvou meu servidor de um ataque de raid. Recomendo demais!"</p>
+                <p class="text-gray-300 italic mb-4">"O melhor bot que já usei. O sistema de segurança salvou meu servidor de um ataque de raid."</p>
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">D</div>
                     <div>
@@ -149,7 +149,7 @@ HTML_LANDING = """
                 </div>
             </div>
             <div class="card bg-[#171717]">
-                <p class="text-gray-300 italic mb-4">"A dashboard é incrível, consigo ver tudo o que acontece no meu servidor em tempo real. Vale cada centavo."</p>
+                <p class="text-gray-300 italic mb-4">"A dashboard é incrível, consigo ver tudo o que acontece no meu servidor em tempo real."</p>
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold">M</div>
                     <div>
@@ -159,7 +159,7 @@ HTML_LANDING = """
                 </div>
             </div>
             <div class="card bg-[#171717]">
-                <p class="text-gray-300 italic mb-4">"Os tickets com menu são muito profissionais. Meus membros adoraram o sistema de atendimento."</p>
+                <p class="text-gray-300 italic mb-4">"Os tickets com menu são muito profissionais. Meus membros adoraram."</p>
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center text-xs font-bold">J</div>
                     <div>
@@ -191,11 +191,9 @@ HTML_LOGIN = """
     <div class="bg-[#171717] p-8 rounded-xl border border-[#262626] w-96 shadow-2xl">
         <h1 class="text-3xl font-bold text-red-600 text-center mb-2">🌊 Surf Trama</h1>
         <p class="text-gray-400 text-sm text-center mb-6">Entre para gerenciar o bot.</p>
-        
         {% if error %}
         <div class="bg-red-900/50 border border-red-500 text-red-300 p-2 rounded mb-4 text-sm text-center">{{ error }}</div>
         {% endif %}
-        
         <form method="POST" action="/login">
             <div class="mb-4">
                 <label class="block text-sm text-gray-400 mb-1">Usuário</label>
@@ -227,11 +225,9 @@ HTML_CADASTRO = """
     <div class="bg-[#171717] p-8 rounded-xl border border-[#262626] w-96 shadow-2xl">
         <h1 class="text-3xl font-bold text-red-600 text-center mb-2">Criar Conta</h1>
         <p class="text-gray-400 text-sm text-center mb-6">Crie sua conta para inserir seu token.</p>
-        
         {% if error %}
         <div class="bg-red-900/50 border border-red-500 text-red-300 p-2 rounded mb-4 text-sm text-center">{{ error }}</div>
         {% endif %}
-        
         <form method="POST" action="/cadastro">
             <div class="mb-4">
                 <label class="block text-sm text-gray-400 mb-1">Usuário</label>
@@ -262,13 +258,11 @@ HTML_VENDAS = """
     <div class="bg-[#171717] p-10 rounded-xl border border-[#262626] w-[500px] text-center shadow-2xl">
         <h1 class="text-4xl font-bold text-red-600 mb-2">Acesso Bloqueado</h1>
         <p class="text-gray-400 mb-6">Você ainda não possui um Token de Licença ativo para acessar a Dashboard.</p>
-        
         <div class="bg-[#0a0a0a] p-4 rounded-lg border border-[#333] mb-6">
             <h2 class="text-xl font-bold text-white mb-2">Adquira o Bot Agora</h2>
             <p class="text-sm text-gray-400 mb-4">Tenha acesso total ao Surf Trama.</p>
             <a href="https://discord.gg/seu_link_de_vendas" target="_blank" class="block w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition">Comprar Token no Discord</a>
         </div>
-
         <form method="POST" action="/validar_token">
             <p class="text-sm text-gray-400 mb-2">Já comprou? Insira seu Token aqui:</p>
             <input type="text" name="token" placeholder="TRAMA-XXXX-XXXX" class="w-full bg-[#0a0a0a] border border-[#333] rounded p-2 text-white text-center focus:border-red-500 focus:outline-none mb-4 uppercase" required>
@@ -473,7 +467,7 @@ class SurfTramaBot(commands.Bot):
             await self.load_extension("cogs.redes_sociais")
             await self.load_extension("cogs.utilitarios")
             await self.load_extension("cogs.automacao")
-            await self.load_extension("cogs.vip") # <--- NOVO MÓDULO AQUI
+            await self.load_extension("cogs.vip") # <--- MÓDULO VIP AQUI
             print("✅ Módulos carregados com sucesso.")
         except Exception as e:
             print(f"❌ ERRO AO CARREGAR MÓDULOS: {e}")
@@ -486,6 +480,8 @@ bot = SurfTramaBot()
 @bot.event
 async def on_ready():
     print(f'✅ Surf Trama online como {bot.user}')
+    # Inicia o site DEPOIS que o bot estiver online (evita erro no Render)
+    keep_alive()
 
 @bot.event
 async def on_message(message):
@@ -501,5 +497,4 @@ if __name__ == "__main__":
     if not TOKEN:
         print("⚠️ Defina a variável DISCORD_TOKEN no painel do Render.")
     else:
-        keep_alive()
         bot.run(TOKEN)
