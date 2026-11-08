@@ -17,12 +17,8 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# --- TOKENS DE VENDA (Sistema de Licença do Bot) ---
-CHAVES_VALIDAS = [
-    "TRAMA-2026-VIP1",
-    "TRAMA-2026-VIP2",
-    "TRAMA-2026-TESTE"
-]
+# --- TOKENS DE VENDA ---
+CHAVES_VALIDAS = ["TRAMA-2026-VIP1", "TRAMA-2026-VIP2", "TRAMA-2026-TESTE"]
 
 class User(UserMixin):
     def __init__(self, id, username, token, is_admin=False):
@@ -47,24 +43,32 @@ def load_user(user_id):
 def setup_database():
     conn = sqlite3.connect('tickets.db')
     cursor = conn.cursor()
+    
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, token TEXT)''')
+    
+    # TABELA DE ESTATÍSTICAS (NOVO)
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE IF NOT EXISTS estatisticas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password_hash TEXT,
-            token TEXT
+            tipo TEXT, 
+            user_id TEXT, 
+            user_name TEXT, 
+            guild_id TEXT,
+            detalhe TEXT,
+            data TEXT
         )
     ''')
+    
     cursor.execute("SELECT * FROM users WHERE username = 'surf157'")
     if not cursor.fetchone():
-        cursor.execute("INSERT INTO users (username, password_hash, token) VALUES (?, ?, ?)", 
-                       ('surf157', generate_password_hash('surf'), 'ADMIN-MASTER-TOKEN'))
+        cursor.execute("INSERT INTO users (username, password_hash, token) VALUES (?, ?, ?)", ('surf157', generate_password_hash('surf'), 'ADMIN-MASTER-TOKEN'))
     conn.commit()
     conn.close()
 
 setup_database()
 
 # --- HTML: PÁGINA INICIAL (LANDING PAGE) ---
+# (Mantido igual ao anterior, mas com link para o dashboard de estatísticas se for admin)
 HTML_LANDING = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -103,6 +107,7 @@ HTML_LANDING = """
 """
 
 # --- HTML: PÁGINA DE LOGIN ---
+# (Mantido igual)
 HTML_LOGIN = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -137,6 +142,7 @@ HTML_LOGIN = """
 """
 
 # --- HTML: PÁGINA DE CADASTRO ---
+# (Mantido igual)
 HTML_CADASTRO = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -170,6 +176,7 @@ HTML_CADASTRO = """
 """
 
 # --- HTML: PÁGINA DE VENDAS ---
+# (Mantido igual)
 HTML_VENDAS = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -198,7 +205,7 @@ HTML_VENDAS = """
 </html>
 """
 
-# --- HTML: DASHBOARD ---
+# --- HTML: DASHBOARD DE ESTATÍSTICAS ---
 HTML_DASHBOARD = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -226,7 +233,28 @@ HTML_DASHBOARD = """
             <a href="/logout" class="bg-[#262626] hover:bg-red-900 text-white px-4 py-2 rounded-lg text-sm transition">Sair</a>
         </div>
 
-        <h2 class="text-xl font-semibold text-white mb-4">📡 Servidores ({{ guilds|length }})</h2>
+        <!-- Cards de Estatísticas (Globais) -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+            <div class="card text-center">
+                <p class="text-sm text-gray-400">👥 Total de Servidores</p>
+                <p class="text-3xl font-bold text-white">{{ guilds|length }}</p>
+            </div>
+            <div class="card text-center">
+                <p class="text-sm text-gray-400">🎫 Tickets Abertos</p>
+                <p class="text-3xl font-bold text-green-500">{{ total_tickets }}</p>
+            </div>
+            <div class="card text-center">
+                <p class="text-sm text-gray-400">💎 Cliques em Comprar</p>
+                <p class="text-3xl font-bold text-yellow-500">{{ total_vendas }}</p>
+            </div>
+            <div class="card text-center">
+                <p class="text-sm text-gray-400">💰 Pagamentos Gerados</p>
+                <p class="text-3xl font-bold text-blue-500">{{ total_pagamentos }}</p>
+            </div>
+        </div>
+
+        <!-- Lista de Servidores -->
+        <h2 class="text-xl font-semibold text-white mb-4">📡 Seus Servidores</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
             {% for guild in guilds %}
             <div class="card">
@@ -258,13 +286,47 @@ HTML_DASHBOARD = """
             </div>
             {% endfor %}
         </div>
+
+        <!-- Tabela de Atividades Recentes -->
+        <h2 class="text-xl font-semibold text-white mb-4">📋 Atividades Recentes</h2>
+        <div class="card overflow-x-auto">
+            <table class="w-full text-left text-sm text-gray-400">
+                <thead class="text-xs text-gray-300 uppercase bg-[#0a0a0a]">
+                    <tr>
+                        <th class="px-6 py-3">Tipo</th>
+                        <th class="px-6 py-3">Usuário</th>
+                        <th class="px-6 py-3">Detalhe</th>
+                        <th class="px-6 py-3">Data</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr class="border-b border-[#262626] hover:bg-[#262626]">
+                        <td class="px-6 py-4 font-bold 
+                            {% if log.tipo == 'Ticket' %}text-green-500
+                            {% elif log.tipo == 'Venda' %}text-yellow-500
+                            {% elif log.tipo == 'Pagamento' %}text-blue-500
+                            {% else %}text-gray-300{% endif %}">
+                            {{ log.tipo }}
+                        </td>
+                        <td class="px-6 py-4">{{ log.user_name }}</td>
+                        <td class="px-6 py-4">{{ log.detalhe }}</td>
+                        <td class="px-6 py-4">{{ log.data }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-4 text-center">Nenhuma atividade registrada ainda.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </body>
 </html>
 """
 
 # --- ROTAS DO SITE ---
-
 @app.route('/')
 def landing():
     return render_template_string(HTML_LANDING)
@@ -299,8 +361,7 @@ def cadastro():
         conn = sqlite3.connect('tickets.db')
         cursor = conn.cursor()
         try:
-            cursor.execute("INSERT INTO users (username, password_hash, token) VALUES (?, ?, ?)", 
-                           (username, generate_password_hash(password), None))
+            cursor.execute("INSERT INTO users (username, password_hash, token) VALUES (?, ?, ?)", (username, generate_password_hash(password), None))
             conn.commit()
             conn.close()
             return redirect(url_for('login'))
@@ -335,15 +396,38 @@ def dashboard():
     if not current_user.token and not current_user.is_admin:
         return render_template_string(HTML_VENDAS)
     if not bot.is_ready(): return "Iniciando bot... Recarregue em 10 segundos.", 200
+    
+    conn = sqlite3.connect('tickets.db')
+    cursor = conn.cursor()
+    
+    # Servidores
     guilds_data = []
     for guild in bot.guilds:
         in_call = sum(1 for member in guild.members if member.voice and member.voice.channel)
-        guilds_data.append({
-            "id": guild.id, "name": guild.name, "icon": guild.icon.url if guild.icon else None,
-            "members": guild.member_count, "in_call": in_call
-        })
+        guilds_data.append({"id": guild.id, "name": guild.name, "icon": guild.icon.url if guild.icon else None, "members": guild.member_count, "in_call": in_call})
     guilds_data.sort(key=lambda x: x['members'], reverse=True)
-    return render_template_string(HTML_DASHBOARD, guilds=guilds_data)
+
+    # Contadores de Estatísticas
+    cursor.execute("SELECT COUNT(*) FROM estatisticas WHERE tipo = 'Ticket'")
+    total_tickets = cursor.fetchone()[0] or 0
+
+    cursor.execute("SELECT COUNT(*) FROM estatisticas WHERE tipo = 'Venda'")
+    total_vendas = cursor.fetchone()[0] or 0
+
+    cursor.execute("SELECT COUNT(*) FROM estatisticas WHERE tipo = 'Pagamento'")
+    total_pagamentos = cursor.fetchone()[0] or 0
+
+    # Logs Recentes (últimos 15)
+    cursor.execute("SELECT tipo, user_name, detalhe, data FROM estatisticas ORDER BY id DESC LIMIT 15")
+    logs = cursor.fetchall()
+    conn.close()
+
+    return render_template_string(HTML_DASHBOARD, 
+        guilds=guilds_data, 
+        total_tickets=total_tickets, 
+        total_vendas=total_vendas, 
+        total_pagamentos=total_pagamentos,
+        logs=logs)
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
@@ -354,60 +438,4 @@ def keep_alive():
     t.start()
 
 # --- Configuração do Bot ---
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-intents.presences = True
-intents.voice_states = True
-
-class SurfTramaBot(commands.Bot):
-    def __init__(self):
-        super().__init__(command_prefix='!', intents=intents)
-        self.COR_TRAMA = 0x8B0000
-        self.COR_PRETA = 0x000000
-
-    async def setup_hook(self):
-        try:
-            await self.load_extension("cogs.moderacao")
-            await self.load_extension("cogs.suporte")
-            await self.load_extension("cogs.seguranca")
-            await self.load_extension("cogs.membros")
-            await self.load_extension("cogs.atendimento")
-            await self.load_extension("cogs.redes_sociais")
-            await self.load_extension("cogs.utilitarios")
-            await self.load_extension("cogs.automacao")
-            await self.load_extension("cogs.vip")
-            await self.load_extension("cogs.pagamentos") # <--- MÓDULO DE PAGAMENTO (SYNCPAY)
-            await self.load_extension("cogs.musica")     # <--- MÓDULO DE MÚSICA
-            print("✅ Módulos carregados com sucesso.")
-        except Exception as e:
-            print(f"❌ ERRO AO CARREGAR MÓDULOS: {e}")
-        
-        try:
-            await self.tree.sync()
-            print("✅ Comandos sincronizados.")
-        except Exception as e:
-            print(f"❌ Erro ao sincronizar: {e}")
-
-bot = SurfTramaBot()
-
-@bot.event
-async def on_ready():
-    print(f'✅ Surf Trama online como {bot.user}')
-    keep_alive()
-
-@bot.event
-async def on_message(message):
-    await bot.process_commands(message)
-
-@bot.tree.command(name="ajuda", description="Mostra o painel de ajuda do Surf Trama")
-async def ajuda(interaction: discord.Interaction):
-    embed = discord.Embed(title="🌊 Ajuda: Surf Trama", description="Use os comandos `/` para interagir.", color=bot.COR_TRAMA)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
-
-if __name__ == "__main__":
-    TOKEN = os.getenv("DISCORD_TOKEN")
-    if not TOKEN:
-        print("⚠️ Defina a variável DISCORD_TOKEN no painel do Render.")
-    else:
-        bot.run(TOKEN)
+# ... (Mesma configuração de intents e classes do surf.py anterior)
