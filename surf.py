@@ -41,7 +41,6 @@ def load_user(user_id):
 def setup_database():
     conn = sqlite3.connect('tickets.db')
     cursor = conn.cursor()
-    # Adicionado o campo 'email'
     cursor.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT UNIQUE, password_hash TEXT, token TEXT)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS estatisticas (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, user_id TEXT, user_name TEXT, guild_id TEXT, detalhe TEXT, data TEXT)''')
     cursor.execute("SELECT * FROM users WHERE username = 'surf157'")
@@ -70,10 +69,10 @@ GLOBAL_STYLE = """
     .btn-primary { background: linear-gradient(135deg, #8B0000, #ff3333); color: white; padding: 12px 24px; border-radius: 10px; font-weight: 600; transition: all 0.3s ease; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
     .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(139, 0, 0, 0.4); }
     .marquee-container { overflow: hidden; white-space: nowrap; position: relative; width: 100%; mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); }
-    .marquee-content { display: inline-block; animation: marquee 30s linear infinite; }
+    .marquee-content { display: inline-flex; gap: 20px; animation: marquee 30s linear infinite; }
     .marquee-content:hover { animation-play-state: paused; }
     @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-    .review-card { display: inline-block; white-space: normal; width: 300px; vertical-align: top; margin-right: 20px; text-align: left; }
+    .review-card { display: inline-block; white-space: normal; width: 320px; flex-shrink: 0; text-align: left; }
 </style>
 """
 
@@ -112,24 +111,39 @@ HTML_LANDING = f"""
         <a href="/cadastro" class="btn-primary text-lg px-10 py-4">Começar Agora</a>
     </header>
 
-    <!-- Funcionalidades e Depoimentos (Mantidos) -->
+    <!-- Funcionalidades -->
     <section class="py-20 px-6 max-w-7xl mx-auto fade-up" style="animation-delay: 0.4s;">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="glass p-6"><div class="text-4xl mb-4">🛡️</div><h3 class="text-xl font-bold text-white">Moderação</h3><p class="text-sm text-gray-400">Anti-raid, anti-link, warns e bans automáticos.</p></div>
-            <div class="glass p-6"><div class="text-4xl mb-4">💎</div><h3 class="text-xl font-bold text-white">Vendas VIP</h3><p class="text-sm text-gray-400">Integração Pix (SyncPay) e cargos automáticos.</p></div>
-            <div class="glass p-6"><div class="text-4xl mb-4">🎵</div><h3 class="text-xl font-bold text-white">Música</h3><p class="text-sm text-gray-400">Toque músicas do YouTube e Spotify em alta qualidade.</p></div>
+        <h2 class="text-3xl font-bold text-center mb-12 text-white">Tudo o que você precisa em um só lugar</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="glass p-6"><div class="text-4xl mb-4">🛡️</div><h3 class="text-xl font-bold text-white mb-2">Moderação e Segurança</h3><p class="text-sm text-gray-400">Anti-raid, anti-link, honeypot, sistema de warns, mute e ban automáticos.</p></div>
+            <div class="glass p-6"><div class="text-4xl mb-4">🎫</div><h3 class="text-xl font-bold text-white mb-2">Sistema de Tickets</h3><p class="text-sm text-gray-400">Atendimento profissional com menus suspensos e criação de canais privados.</p></div>
+            <div class="glass p-6"><div class="text-4xl mb-4">💎</div><h3 class="text-xl font-bold text-white mb-2">Vendas Automáticas</h3><p class="text-sm text-gray-400">Venda cargos VIP com integração de pagamento Pix (SyncPay) automática.</p></div>
+            <div class="glass p-6"><div class="text-4xl mb-4">👥</div><h3 class="text-xl font-bold text-white mb-2">Gestão de Membros</h3><p class="text-sm text-gray-400">Boas-vindas automáticas, cargos por reação e cargo automático ao entrar.</p></div>
+            <div class="glass p-6"><div class="text-4xl mb-4">⚙️</div><h3 class="text-xl font-bold text-white mb-2">Automação Total</h3><p class="text-sm text-gray-400">Gatilhos personalizados, reações automáticas e sorteios interativos.</p></div>
+            <div class="glass p-6"><div class="text-4xl mb-4">🎵</div><h3 class="text-xl font-bold text-white mb-2">Sistema de Música</h3><p class="text-sm text-gray-400">Toque músicas do YouTube e Spotify em alta qualidade com fila.</p></div>
         </div>
     </section>
 
+    <!-- Depoimentos -->
     <section class="py-20 overflow-hidden fade-up" style="animation-delay: 0.6s;">
         <h2 class="text-3xl font-bold text-center mb-12 text-white">O que dizem sobre nós</h2>
         <div class="marquee-container">
             <div class="marquee-content">
-                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm">"O melhor bot que já usei!"</p><p class="text-white text-xs mt-2">- Dono do Servidor</p></div>
-                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm">"A dashboard é incrível."</p><p class="text-white text-xs mt-2">- Maria Gamer</p></div>
+                <!-- Grupo 1 -->
+                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"O melhor bot que já usei. O sistema de segurança salvou meu servidor de um ataque."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">D</div><p class="text-white text-sm font-bold">dono_server</p></div></div>
+                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"A dashboard é incrível, consigo ver tudo em tempo real. Vale cada centavo."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold">M</div><p class="text-white text-sm font-bold">maria_gamer</p></div></div>
+                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"Os tickets com menu são muito profissionais. Meus membros adoraram."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold">J</div><p class="text-white text-sm font-bold">joao_trama</p></div></div>
+                <!-- Grupo 2 (Cópia) -->
+                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"O melhor bot que já usei. O sistema de segurança salvou meu servidor de um ataque."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">D</div><p class="text-white text-sm font-bold">dono_server</p></div></div>
+                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"A dashboard é incrível, consigo ver tudo em tempo real. Vale cada centavo."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold">M</div><p class="text-white text-sm font-bold">maria_gamer</p></div></div>
+                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"Os tickets com menu são muito profissionais. Meus membros adoraram."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold">J</div><p class="text-white text-sm font-bold">joao_trama</p></div></div>
             </div>
         </div>
     </section>
+
+    <footer class="text-center py-8 text-gray-600 text-sm border-t border-[#262626]">
+        <p>&copy; 2026 Surf Trama. Todos os direitos reservados.</p>
+    </footer>
 </body>
 </html>
 """
@@ -155,7 +169,7 @@ HTML_LOGIN = f"""
 </html>
 """
 
-# --- HTML: CADASTRO (AGORA COM EMAIL) ---
+# --- HTML: CADASTRO ---
 HTML_CADASTRO = f"""
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -177,7 +191,64 @@ HTML_CADASTRO = f"""
 </html>
 """
 
-# --- ROTAS ---
+# --- HTML: DASHBOARD ---
+HTML_DASHBOARD = f"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><title>Dashboard</title><script src="https://cdn.tailwindcss.com"></script>{GLOBAL_STYLE}</head>
+<body class="p-8">
+    <div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div></div>
+    <div class="max-w-6xl mx-auto fade-up">
+        <div class="flex justify-between items-center mb-10 glass p-4 rounded-2xl">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-700 to-red-500 flex items-center justify-center font-bold text-white">T</div>
+                <div><h1 class="text-lg font-bold text-white">Dashboard</h1><p class="text-xs text-gray-400">Olá, {{{{ current_user.username }}}}</p></div>
+            </div>
+            <a href="/logout" class="bg-white/5 hover:bg-red-900/50 border border-white/10 text-white px-4 py-2 rounded-lg text-sm transition">Sair</a>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="glass p-6 text-center border-t-2 border-red-600"><p class="text-xs text-gray-400 mb-1">Servidores</p><p class="text-4xl font-extrabold text-white">{{{{ guilds|length }}}}</p></div>
+            <div class="glass p-6 text-center border-t-2 border-green-600"><p class="text-xs text-gray-400 mb-1">Tickets</p><p class="text-4xl font-extrabold text-green-500">{{{{ total_tickets }}}}</p></div>
+            <div class="glass p-6 text-center border-t-2 border-yellow-600"><p class="text-xs text-gray-400 mb-1">Vendas</p><p class="text-4xl font-extrabold text-yellow-500">{{{{ total_vendas }}}}</p></div>
+            <div class="glass p-6 text-center border-t-2 border-blue-600"><p class="text-xs text-gray-400 mb-1">Pix Gerados</p><p class="text-4xl font-extrabold text-blue-500">{{{{ total_pagamentos }}}}</p></div>
+        </div>
+        <h2 class="text-lg font-bold text-white mb-4">📡 Servidores</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
+            {{% for guild in guilds %}}
+            <div class="glass p-4 flex items-center gap-4">
+                {{% if guild.icon %}}<img src="{{{{ guild.icon }}}}" class="w-12 h-12 rounded-full border border-gray-600">{{% else %}}<div class="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center text-xs">T</div>{{% endif %}}
+                <div><h3 class="font-bold text-white text-md truncate w-40">{{{{ guild.name }}}}</h3><p class="text-xs text-gray-400">{{{{ guild.members }}}} membros</p></div>
+            </div>
+            {{% endfor %}}
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+# --- HTML: VENDAS (CASO NÃO TENHA TOKEN) ---
+HTML_VENDAS = f"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><title>Acesso Bloqueado</title><script src="https://cdn.tailwindcss.com"></script>{GLOBAL_STYLE}</head>
+<body class="flex items-center justify-center h-screen">
+    <div class="bg-blobs"><div class="blob blob-1"></div></div>
+    <div class="glass p-10 w-[450px] text-center fade-up">
+        <h1 class="text-3xl font-bold text-red-500 mb-4">Acesso Restrito</h1>
+        <p class="text-gray-400 mb-8">Você precisa de um Token de Licença válido para acessar a Dashboard.</p>
+        <a href="/comprar" class="btn-primary block w-full py-3 mb-6">Comprar Token de Acesso</a>
+        <form method="POST" action="/validar_token">
+            <p class="text-xs text-gray-500 mb-2 uppercase">Já comprou? Ative aqui:</p>
+            <input type="text" name="token" placeholder="TRAMA-XXXX-XXXX" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white text-center focus:border-red-500 outline-none mb-4 uppercase" required>
+            <button type="submit" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition">Ativar Token</button>
+        </form>
+        <a href="/logout" class="block mt-6 text-sm text-gray-600 hover:text-white transition">Sair da Conta</a>
+    </div>
+</body>
+</html>
+"""
+
+# --- ROTAS DO SITE ---
 @app.route('/')
 def landing(): return render_template_string(HTML_LANDING)
 
@@ -212,12 +283,21 @@ def cadastro():
 @login_required
 def logout(): logout_user(); return redirect(url_for('landing'))
 
+@app.route('/validar_token', methods=['POST'])
+@login_required
+def validar_token():
+    token = request.form.get('token').upper()
+    if token in CHAVES_VALIDAS:
+        conn = sqlite3.connect('tickets.db'); cursor = conn.cursor()
+        cursor.execute("UPDATE users SET token = ? WHERE id = ?", (token, current_user.id))
+        conn.commit(); conn.close(); return redirect(url_for('dashboard'))
+    return render_template_string(HTML_VENDAS, error="Token inválido.")
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
     if not current_user.token and not current_user.is_admin: return render_template_string(HTML_VENDAS)
     if not bot.is_ready(): return "Iniciando... Recarregue.", 200
-    # (O restante do código da dashboard permanece o mesmo)
     conn = sqlite3.connect('tickets.db'); cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM estatisticas WHERE tipo = 'Ticket'"); total_tickets = cursor.fetchone()[0] or 0
     cursor.execute("SELECT COUNT(*) FROM estatisticas WHERE tipo = 'Venda'"); total_vendas = cursor.fetchone()[0] or 0
