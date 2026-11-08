@@ -72,7 +72,7 @@ class BotaoAbrirFormulario(discord.ui.View):
         self.titulo = titulo
         self.perguntas = perguntas
 
-    @discord.ui.button(label="Preencher Formulário", style=discord.ButtonStyle.primary, emoji="📝", custom_id="btn_formulario")
+    @discord.ui.button(label="Preencher Formulário", style=discord.ButtonStyle.primary, emoji="📝", custom_id="btn_formulario_v2")
     async def abrir(self, interaction: discord.Interaction, button: discord.ui.Button):
         # Isso abre a janelinha (Modal) para o usuário preencher
         await interaction.response.send_modal(ModalFormulario(self.titulo, self.perguntas))
@@ -94,6 +94,9 @@ class ModalFormulario(discord.ui.Modal):
             ))
 
     async def on_submit(self, interaction: discord.Interaction):
+        # CORREÇÃO: Avisa o Discord que recebeu o formulário (evita timeout)
+        await interaction.response.defer(ephemeral=True)
+
         # Pega as respostas que a pessoa digitou
         respostas = []
         for i, child in enumerate(self.children):
@@ -120,7 +123,8 @@ class ModalFormulario(discord.ui.Modal):
         
         await canal_resposta.send(embed=embed)
         
-        await interaction.response.send_message("✅ Formulário enviado com sucesso! A Staff vai analisar.", ephemeral=True)
+        # CORREÇÃO: Usa followup.send após o defer
+        await interaction.followup.send("✅ Formulário enviado com sucesso! A Staff vai analisar.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Atendimento(bot))
