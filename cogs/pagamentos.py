@@ -11,7 +11,6 @@ class Pagamentos(commands.Cog):
         self.conn = sqlite3.connect('tickets.db')
         self.cursor = self.conn.cursor()
         
-        # Configuração da SyncPay
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS syncpay_config (
                 guild_id TEXT PRIMARY KEY,
@@ -42,7 +41,7 @@ class Pagamentos(commands.Cog):
         atuais = self.get_textos(interaction.guild_id)
         await interaction.response.send_modal(ModalConfigurarMensagens(atuais))
 
-    @app_commands.command(name="painel-vip", description="Cria o painel de vendas.")
+    @app_commands.command(name="painel-vip", description="Cria o painel de vendas (e remove os antigos).")
     @app_commands.checks.has_permissions(administrator=True)
     async def painel_vip(self, interaction: discord.Interaction, imagem: str = None):
         self.cursor.execute("SELECT 1 FROM syncpay_config WHERE guild_id = ?", (str(interaction.guild_id),))
@@ -50,30 +49,35 @@ class Pagamentos(commands.Cog):
             await interaction.response.send_message("❌ Configure as chaves da SyncPay primeiro com `/configurar-syncpay`.", ephemeral=True)
             return
 
+        # LIMPEZA: Apaga mensagens antigas do bot neste canal que contenham o título do painel
         textos = self.get_textos(interaction.guild_id)
+        def is_old_panel(msg):
+            return msg.author == self.bot.user and msg.embeds and msg.embeds[0].title == textos["titulo"]
+        
+        try:
+            await interaction.channel.purge(limit=50, check=is_old_panel)
+        except:
+            pass # Se não tiver permissão para apagar, ignora
+
         embed = discord.Embed(title=textos["titulo"], description=textos["desc"], color=discord.Color.gold())
         if imagem: embed.set_image(url=imagem)
         
-        await interaction.response.send_message("Painel criado!", ephemeral=True)
+        await interaction.response.send_message("Painel criado e antigos removidos!", ephemeral=True)
         await interaction.channel.send(embed=embed, view=BotaoComprarVIP())
 
     async def gerar_pix_syncpay(self, interaction: discord.Interaction, public_token: str, secret_token: str, valor: float):
-        # URL baseada nos exemplos da comunidade: https://api.syncpay.pro/v1/gateway/api/
         url = "https://api.syncpay.pro/v1/gateway/api/pix/cashIn"
         
-        # Payload baseado na estrutura da biblioteca syncpay [citation:3][citation:5]
         payload = {
             "amount": valor,
             "client": {
                 "name": interaction.user.name,
                 "email": f"{interaction.user.id}@discord.com",
-                "cpf": "00000000000" # CPF fictício, pois o Discord não fornece
+                "cpf": "00000000000"
             },
             "webhook_url": "https://seu-site.onrender.com/webhook"
         }
         
-        # Headers: Vamos testar o padrão mais comum para APIs que usam Public/Secret
-        # Algumas usam Bearer, outras usam headers customizados. Vamos tentar o mais comum.
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {secret_token}",
@@ -85,7 +89,6 @@ class Pagamentos(commands.Cog):
             response.raise_for_status()
             dados = response.json()
             
-            # DIAGNÓSTICO POR DM
             try:
                 await interaction.user.send(f"🔍 **Diagnóstico SyncPay:**\n```json\n{json.dumps(dados, indent=2)}\n```")
             except: pass
@@ -94,7 +97,6 @@ class Pagamentos(commands.Cog):
         except Exception as e:
             print(f"Erro SyncPay: {e}")
             try:
-                # Tenta capturar a resposta de erro da API para mostrar no DM
                 erro_detalhado = e.response.text if hasattr(e, 'response') else str(e)
                 await interaction.user.send(f"❌ **Erro SyncPay:**\n```{erro_detalhado}```")
             except: pass
@@ -133,11 +135,12 @@ class ModalConfigurarMensagens(discord.ui.Modal, title="Personalizar Mensagens V
         cog.conn.commit()
         await interaction.response.send_message("✅ Mensagens personalizadas!", ephemeral=True)
 
-# --- BOTÕES ---
+# --- BOTÕES PERSISTENTES ---
 class BotaoComprarVIP(discord.ui.View):
-    def __init__(self): super().__init__(timeout=None)
+    def __init__(self): 
+        super().__init__(timeout=None) # <--- ISSO FAZ O BOTÃO FUNCIONAR PARA SEMPRE
 
-    @discord.ui.button(label="Comprar VIP", style=discord.ButtonStyle.success, emoji="💎", custom_id="btn_comprar_vip_v12")
+    @discord.ui.button(label="Comprar VIP", style=discord.ButtonStyle.success, emoji="💎", custom_id="btn_comprar_vip_v13")
     async def comprar(self, interaction: discord.Interaction, button: discord.ui.Button):
         cog = interaction.client.get_cog("Pagamentos")
         textos = cog.get_textos(interaction.guild_id)
@@ -161,17 +164,18 @@ class BotaoComprarVIP(discord.ui.View):
         await interaction.response.send_message(f"✅ Canal criado: {canal.mention}", ephemeral=True)
 
 class MenuPlanos(discord.ui.View):
-    def __init__(self): super().__init__(timeout=None)
+    def __init__(self): 
+        super().__init__(timeout=None) # <--- ISSO FAZ OS BOTÕES DE PLANOS FUNCIONAREM PARA SEMPRE
 
-    @discord.ui.button(label="VIP Básico - R$ 9,90", style=discord.ButtonStyle.secondary, emoji="🥉", custom_id="btn_plano_basico_v12")
+    @discord.ui.button(label="VIP Básico - R$ 9,90", style=discord.ButtonStyle.secondary, emoji="🥉", custom_id="btn_plano_basico_v13")
     async def plano_basico(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.processar_pagamento(interaction, 9.90, "Básico")
 
-    @discord.ui.button(label="VIP Premium - R$ 19,90", style=discord.ButtonStyle.primary, emoji="🥈", custom_id="btn_plano_premium_v12")
+    @discord.ui.button(label="VIP Premium - R$ 19,90", style=discord.ButtonStyle.primary, emoji="🥈", custom_id="btn_plano_premium_v13")
     async def plano_premium(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.processar_pagamento(interaction, 19.90, "Premium")
 
-    @discord.ui.button(label="VIP Master - R$ 29,90", style=discord.ButtonStyle.success, emoji="🥇", custom_id="btn_plano_master_v12")
+    @discord.ui.button(label="VIP Master - R$ 29,90", style=discord.ButtonStyle.success, emoji="🥇", custom_id="btn_plano_master_v13")
     async def plano_master(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.processar_pagamento(interaction, 29.90, "Master")
 
