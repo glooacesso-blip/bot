@@ -13,3 +13,4 @@ tweepy
 twitchAPI
 aiohttp
 werkzeug
+requests
