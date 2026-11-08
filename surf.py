@@ -1,6 +1,6 @@
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import commands
 import os
 import sqlite3
 import datetime
@@ -11,7 +11,7 @@ from threading import Thread
 app = Flask('')
 SENHA_ADMIN = "trama123"
 
-# --- HTML DO SITE (DASHBOARD) ---
+# --- HTML DO SITE (DASHBOARD FUNCIONAL) ---
 HTML_DASHBOARD = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -19,9 +19,7 @@ HTML_DASHBOARD = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surf Trama | Dashboard</title>
-    <!-- Tailwind CSS para o visual igual ao da imagem -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js para o gráfico -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
@@ -67,7 +65,6 @@ HTML_DASHBOARD = """
 
     <!-- Main Content -->
     <main class="flex-1 overflow-y-auto p-8">
-        <!-- Header -->
         <div class="flex justify-between items-center mb-8">
             <div>
                 <h2 class="text-2xl font-bold text-white">Visão geral</h2>
@@ -84,28 +81,21 @@ HTML_DASHBOARD = """
             <div class="card">
                 <p class="stat-label flex items-center gap-2">💬 Mensagens Registradas</p>
                 <p class="stat-value mt-2">{{ total_mensagens }}</p>
-                <p class="text-xs text-green-500 mt-1">Registros ainda disponíveis</p>
             </div>
             <div class="card">
                 <p class="stat-label flex items-center gap-2">💬 Mensagens - 30 dias</p>
                 <p class="stat-value mt-2">{{ mensagens_30d }}</p>
-                <p class="text-xs text-gray-500 mt-1">No período selecionado</p>
             </div>
             <div class="card">
-                <p class="stat-label flex items-center gap-2">🎧 Tempo em call - 30 dias</p>
+                <p class="stat-label flex items-center gap-2">🎧 Tempo em call (Total)</p>
                 <p class="stat-value mt-2">{{ tempo_call }}</p>
-                <p class="text-xs text-gray-500 mt-1">Sessões observadas em servidores</p>
             </div>
         </div>
 
         <!-- Gráfico -->
         <div class="card mb-8">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-white font-semibold">Atividade nos últimos 30 dias</h3>
-                <div class="bg-[#262626] rounded-md p-1 flex gap-1">
-                    <button class="px-3 py-1 text-xs bg-[#171717] text-white rounded">Mensagens</button>
-                    <button class="px-3 py-1 text-xs text-gray-400">Voz</button>
-                </div>
+                <h3 class="text-white font-semibold">Atividade (Mensagens/Dia)</h3>
             </div>
             <div class="h-64">
                 <canvas id="activityChart"></canvas>
@@ -114,8 +104,7 @@ HTML_DASHBOARD = """
 
         <!-- Onde você mais fica em call -->
         <div class="card mb-8">
-            <h3 class="text-white font-semibold mb-4">Onde mais fica em call</h3>
-            <p class="text-xs text-gray-400 mb-4">Tempo registrado por canal nos últimos 30 dias.</p>
+            <h3 class="text-white font-semibold mb-4">Canais mais usados (Call)</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {% for canal in canais_top %}
                 <div class="bg-[#262626] p-4 rounded-lg flex items-center justify-between">
@@ -129,56 +118,47 @@ HTML_DASHBOARD = """
             </div>
         </div>
 
-        <!-- Top Servidores e DMs -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="card">
-                <h3 class="text-white font-semibold mb-2">Top Servidores</h3>
-                <p class="text-xs text-gray-400 mb-4">Mensagens registradas nos últimos 30 dias.</p>
-                {% for server in top_servers %}
-                <div class="flex justify-between items-center py-2 border-b border-[#262626]">
-                    <span class="text-sm text-gray-300">{{ server.nome }}</span>
-                    <span class="text-sm font-bold text-white">{{ server.qtd }}</span>
-                </div>
-                {% endfor %}
-            </div>
-            <div class="card">
-                <h3 class="text-white font-semibold mb-2">Top DMs</h3>
-                <p class="text-xs text-gray-400 mb-4">Conversas privadas</p>
-                <div class="flex flex-col items-center justify-center h-32 text-gray-500">
-                    <span class="text-2xl mb-2">💬</span>
-                    <p class="text-sm">Histórico indisponível</p>
-                </div>
+        <!-- Top Servidores -->
+        <div class="card">
+            <h3 class="text-white font-semibold mb-2">Top Servidores</h3>
+            <div class="flex justify-between items-center py-2 border-b border-[#262626]">
+                <span class="text-sm text-gray-300">{{ top_server_nome }}</span>
+                <span class="text-sm font-bold text-white">{{ total_mensagens }}</span>
             </div>
         </div>
     </main>
 
     <script>
-        // Gráfico de linha simulado (você pode puxar os dados reais do banco depois)
-        const ctx = document.getElementById('activityChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['10/10', '24/10', '08/11'],
-                datasets: [{
-                    label: 'Mensagens',
-                    data: [0, 0, 16],
-                    borderColor: '#8B0000',
-                    backgroundColor: 'rgba(139, 0, 0, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { grid: { color: '#262626' }, ticks: { color: '#a3a3a3' } },
-                    y: { grid: { color: '#262626' }, ticks: { color: '#a3a3a3' } }
-                }
-            }
-        });
+        // Puxa os dados reais da API do Flask
+        fetch('/api/chart_data')
+            .then(response => response.json())
+            .then(data => {
+                const ctx = document.getElementById('activityChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: 'Mensagens',
+                            data: data.values,
+                            borderColor: '#8B0000',
+                            backgroundColor: 'rgba(139, 0, 0, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { color: '#262626' }, ticks: { color: '#a3a3a3' } },
+                            y: { grid: { color: '#262626' }, ticks: { color: '#a3a3a3' }, beginAtZero: true }
+                        }
+                    }
+                });
+            });
     </script>
 </body>
 </html>
@@ -188,20 +168,8 @@ HTML_DASHBOARD = """
 def setup_database():
     conn = sqlite3.connect('tickets.db')
     cursor = conn.cursor()
-    # Tabela de mensagens
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS estatisticas_mensagens (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT, guild_id TEXT, data TEXT
-        )
-    ''')
-    # Tabela de call
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS estatisticas_call (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT, guild_id TEXT, channel_name TEXT, tempo_segundos INTEGER, data TEXT
-        )
-    ''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS estatisticas_mensagens (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, guild_id TEXT, guild_name TEXT, data TEXT)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS estatisticas_call (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, guild_id TEXT, channel_name TEXT, tempo_segundos INTEGER, data TEXT)''')
     conn.commit()
     conn.close()
 
@@ -215,27 +183,36 @@ def home():
     conn = sqlite3.connect('tickets.db')
     cursor = conn.cursor()
     
-    # Pega os dados reais
+    # 1. Total de mensagens
     cursor.execute("SELECT COUNT(*) FROM estatisticas_mensagens")
     total_msgs = cursor.fetchone()[0] or 0
     
+    # 2. Mensagens nos últimos 30 dias
     cursor.execute("SELECT COUNT(*) FROM estatisticas_mensagens WHERE data >= date('now', '-30 days')")
     msgs_30d = cursor.fetchone()[0] or 0
     
+    # 3. Tempo total em call
     cursor.execute("SELECT SUM(tempo_segundos) FROM estatisticas_call")
     total_segundos = cursor.fetchone()[0] or 0
     horas = total_segundos // 3600
     minutos = (total_segundos % 3600) // 60
     tempo_call = f"{horas}h {minutos}m"
+
+    # 4. Canais mais usados
+    cursor.execute("SELECT channel_name, SUM(tempo_segundos) as total FROM estatisticas_call GROUP BY channel_name ORDER BY total DESC LIMIT 4")
+    canais_raw = cursor.fetchall()
+    canais_top = []
+    for nome, segundos in canais_raw:
+        h = segundos // 3600
+        m = (segundos % 3600) // 60
+        canais_top.append({"nome": nome, "tempo": f"{h}h {m}m"})
     
-    # Dados para o gráfico e tops (simulados por enquanto para ficar igual ao print)
-    canais_top = [
-        {"nome": "#EM-BREVE", "tempo": "13h 25m"},
-        {"nome": "#EM-BREVE", "tempo": "5h 43m"},
-        {"nome": "#EM-BREVE", "tempo": "4h 55m"},
-        {"nome": "#EM-BREVE", "tempo": "4h 30m"}
-    ]
-    top_servers = [{"nome": "TRAMA #EM-BREVE", "qtd": msgs_30d}]
+    # Se não tiver dados, mostra um padrão
+    if not canais_top:
+        canais_top = [{"nome": "Nenhum registro ainda", "tempo": "0h 0m"}]
+
+    # 5. Nome do servidor
+    top_server_nome = bot.guilds[0].name if bot.guilds else "Desconhecido"
     
     conn.close()
     
@@ -245,12 +222,31 @@ def home():
         mensagens_30d=msgs_30d,
         tempo_call=tempo_call,
         canais_top=canais_top,
-        top_servers=top_servers
+        top_server_nome=top_server_nome
     )
+
+@app.route('/api/chart_data')
+def chart_data():
+    # Rota que alimenta o gráfico com os últimos 10 dias de mensagens
+    conn = sqlite3.connect('tickets.db')
+    cursor = conn.cursor()
+    
+    labels = []
+    values = []
+    
+    for i in range(9, -1, -1): # Pega os últimos 10 dias
+        data_alvo = (datetime.datetime.now() - datetime.timedelta(days=i)).strftime("%Y-%m-%d")
+        labels.append(data_alvo[8:10] + "/" + data_alvo[5:7]) # Formato DD/MM
+        
+        cursor.execute("SELECT COUNT(*) FROM estatisticas_mensagens WHERE data LIKE ?", (f"{data_alvo}%",))
+        count = cursor.fetchone()[0] or 0
+        values.append(count)
+        
+    conn.close()
+    return jsonify({"labels": labels, "values": values})
 
 @app.route('/sair')
 def sair_servidor():
-    # Função simples para derrubar o bot (você pode proteger com senha)
     os._exit(0)
 
 def run_web():
@@ -271,6 +267,7 @@ class SurfTramaBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix='!', intents=intents)
         self.COR_TRAMA = 0x8B0000
+        self.COR_PRETA = 0x000000
         self.call_timers = {}
 
     async def setup_hook(self):
@@ -292,7 +289,6 @@ class SurfTramaBot(commands.Bot):
 
 bot = SurfTramaBot()
 
-# --- EVENTOS PARA ESTATÍSTICAS ---
 @bot.event
 async def on_ready():
     print(f'✅ Surf Trama v2.0 online como {bot.user}')
@@ -300,12 +296,12 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    if not message.author.bot:
-        # Registrar mensagem no banco
+    if not message.author.bot and message.guild:
         conn = sqlite3.connect('tickets.db')
         cursor = conn.cursor()
         agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute("INSERT INTO estatisticas_mensagens (user_id, guild_id, data) VALUES (?, ?, ?)", (str(message.author.id), str(message.guild.id), agora))
+        cursor.execute("INSERT INTO estatisticas_mensagens (user_id, guild_id, guild_name, data) VALUES (?, ?, ?, ?)", 
+                       (str(message.author.id), str(message.guild.id), message.guild.name, agora))
         conn.commit()
         conn.close()
     
@@ -313,15 +309,12 @@ async def on_message(message):
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    # Se entrou na call
     if before.channel is None and after.channel is not None:
         bot.call_timers[member.id] = datetime.datetime.now()
-    # Se saiu da call
     elif before.channel is not None and after.channel is None:
         if member.id in bot.call_timers:
             entrada = bot.call_timers.pop(member.id)
             tempo = (datetime.datetime.now() - entrada).total_seconds()
-            # Salva o tempo no banco
             conn = sqlite3.connect('tickets.db')
             cursor = conn.cursor()
             agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -330,7 +323,7 @@ async def on_voice_state_update(member, before, after):
             conn.commit()
             conn.close()
 
-@bot.tree.command(name="ajuda", description="Mostra o painel de ajuda.")
+@bot.tree.command(name="ajuda", description="Mostra o painel de ajuda do Surf Trama")
 async def ajuda(interaction: discord.Interaction):
     embed = discord.Embed(title="🌊 Central de Ajuda: Surf Trama", description="Use os comandos `/` para interagir.", color=bot.COR_TRAMA)
     await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -338,7 +331,7 @@ async def ajuda(interaction: discord.Interaction):
 if __name__ == "__main__":
     TOKEN = os.getenv("DISCORD_TOKEN")
     if not TOKEN:
-        print("⚠️ Defina a variável DISCORD_TOKEN.")
+        print("⚠️ Defina a variável DISCORD_TOKEN no painel do Render.")
     else:
         keep_alive()
         bot.run(TOKEN)
