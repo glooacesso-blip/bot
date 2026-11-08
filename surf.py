@@ -83,7 +83,6 @@ HTML_LANDING = """
     </style>
 </head>
 <body>
-    <!-- Navbar -->
     <nav class="flex justify-between items-center p-6 border-b border-[#262626] bg-[#0a0a0a]/90 backdrop-blur sticky top-0 z-50">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-red-700 flex items-center justify-center font-bold text-white">T</div>
@@ -94,48 +93,40 @@ HTML_LANDING = """
         </div>
     </nav>
 
-    <!-- Hero Section -->
     <header class="hero-bg py-24 px-6 text-center border-b border-[#262626]">
         <h1 class="text-5xl font-extrabold mb-4">Domine seu servidor com o <br><span class="gradient-text">Surf Trama</span></h1>
         <p class="text-gray-400 text-lg max-w-2xl mx-auto mb-8">O bot definitivo de moderação, segurança, engajamento e vendas para a sua comunidade. Rápido, seguro e 100% personalizável.</p>
         <a href="/login" class="bg-red-700 hover:bg-red-600 text-white px-8 py-3 rounded-lg font-bold text-lg transition shadow-lg shadow-red-900/50">Adicionar ao Discord</a>
     </header>
 
-    <!-- Features (Comandos) -->
     <section class="py-20 px-6 max-w-6xl mx-auto">
         <h2 class="text-3xl font-bold text-center mb-12 text-white">Tudo o que você precisa em um só lugar</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Moderação -->
             <div class="card">
                 <div class="text-4xl mb-4">🛡️</div>
                 <h3 class="text-xl font-bold text-white mb-2">Moderação e Segurança</h3>
                 <p class="text-sm text-gray-400">Anti-raid, anti-link, honeypot, sistema de warns, mute e ban automáticos. Mantenha o seu servidor seguro contra invasores.</p>
             </div>
-            <!-- Suporte -->
             <div class="card">
                 <div class="text-4xl mb-4">🎫</div>
                 <h3 class="text-xl font-bold text-white mb-2">Sistema de Tickets</h3>
                 <p class="text-sm text-gray-400">Atendimento profissional com menus suspensos, formulários personalizados e criação de canais privados.</p>
             </div>
-            <!-- Membros -->
             <div class="card">
                 <div class="text-4xl mb-4">👥</div>
                 <h3 class="text-xl font-bold text-white mb-2">Gestão de Membros</h3>
                 <p class="text-sm text-gray-400">Boas-vindas automáticas, cargos por reação, cargos por bio, contadores dinâmicos e sistema de primeira dama.</p>
             </div>
-            <!-- Automação -->
             <div class="card">
                 <div class="text-4xl mb-4">⚙️</div>
                 <h3 class="text-xl font-bold text-white mb-2">Automação Total</h3>
                 <p class="text-sm text-gray-400">Gatilhos personalizados, reações automáticas, mensagens agendadas e sorteios interativos.</p>
             </div>
-            <!-- Social -->
             <div class="card">
                 <div class="text-4xl mb-4">📱</div>
                 <h3 class="text-xl font-bold text-white mb-2">Redes Sociais</h3>
                 <p class="text-sm text-gray-400">Notificações de live na Twitch, downloads de vídeos e sistema de Tellonym para perguntas anônimas.</p>
             </div>
-            <!-- Games -->
             <div class="card">
                 <div class="text-4xl mb-4">🎮</div>
                 <h3 class="text-xl font-bold text-white mb-2">Integração com Jogos</h3>
@@ -144,7 +135,6 @@ HTML_LANDING = """
         </div>
     </section>
 
-    <!-- Depoimentos -->
     <section class="py-20 bg-[#0f0f0f] border-t border-[#262626] px-6">
         <h2 class="text-3xl font-bold text-center mb-12 text-white">O que dizem sobre nós</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
@@ -181,7 +171,6 @@ HTML_LANDING = """
         </div>
     </section>
 
-    <!-- Footer -->
     <footer class="text-center py-8 text-gray-500 text-sm border-t border-[#262626]">
         <p>&copy; 2026 Surf Trama. Todos os direitos reservados.</p>
     </footer>
@@ -484,6 +473,7 @@ class SurfTramaBot(commands.Bot):
             await self.load_extension("cogs.redes_sociais")
             await self.load_extension("cogs.utilitarios")
             await self.load_extension("cogs.automacao")
+            await self.load_extension("cogs.vip") # <--- NOVO MÓDULO AQUI
             print("✅ Módulos carregados com sucesso.")
         except Exception as e:
             print(f"❌ ERRO AO CARREGAR MÓDULOS: {e}")
