@@ -9,7 +9,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 from threading import Thread
 
-# --- Configuração do Servidor Web ---
+# --- Configuração do Servidor Web (Flask) ---
 app = Flask(__name__)
 app.secret_key = 'chave_super_secreta_surf_trama_2026'
 
@@ -55,7 +55,6 @@ def setup_database():
             token TEXT
         )
     ''')
-    # Cria o seu login de Admin
     cursor.execute("SELECT * FROM users WHERE username = 'surf157'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password_hash, token) VALUES (?, ?, ?)", 
@@ -96,7 +95,7 @@ HTML_LANDING = """
 
     <header class="hero-bg py-24 px-6 text-center border-b border-[#262626]">
         <h1 class="text-5xl font-extrabold mb-4">Domine seu servidor com o <br><span class="gradient-text">Surf Trama</span></h1>
-        <p class="text-gray-400 text-lg max-w-2xl mx-auto mb-8">O bot definitivo de moderação, segurança, engajamento, música e vendas para a sua comunidade.</p>
+        <p class="text-gray-400 text-lg max-w-2xl mx-auto mb-8">O bot definitivo de moderação, segurança, engajamento e vendas para a sua comunidade.</p>
         <a href="/login" class="bg-red-700 hover:bg-red-600 text-white px-8 py-3 rounded-lg font-bold text-lg transition shadow-lg shadow-red-900/50">Adicionar ao Discord</a>
     </header>
 </body>
@@ -170,7 +169,7 @@ HTML_CADASTRO = """
 </html>
 """
 
-# --- HTML: PÁGINA DE VENDAS (BLOQUEIO SEM TOKEN) ---
+# --- HTML: PÁGINA DE VENDAS ---
 HTML_VENDAS = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -351,14 +350,15 @@ def run_web():
     app.run(host='0.0.0.0', port=port)
 
 def keep_alive():
-    t = Thread(target=run_web); t.start()
+    t = Thread(target=run_web)
+    t.start()
 
 # --- Configuração do Bot ---
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.presences = True
-intents.voice_states = True # Necessário para o módulo de música
+intents.voice_states = True
 
 class SurfTramaBot(commands.Bot):
     def __init__(self):
@@ -378,12 +378,11 @@ class SurfTramaBot(commands.Bot):
             await self.load_extension("cogs.automacao")
             await self.load_extension("cogs.vip")
             await self.load_extension("cogs.pagamentos")
-            await self.load_extension("cogs.musica") # <--- MÓDULO DE MÚSICA
+            await self.load_extension("cogs.musica")
             print("✅ Módulos carregados com sucesso.")
         except Exception as e:
             print(f"❌ ERRO AO CARREGAR MÓDULOS: {e}")
         
-        # Sincroniza os comandos
         try:
             await self.tree.sync()
             print("✅ Comandos sincronizados.")
@@ -395,11 +394,7 @@ bot = SurfTramaBot()
 @bot.event
 async def on_ready():
     print(f'✅ Surf Trama online como {bot.user}')
-    keep_alive() # Inicia o site
-
-@bot.event
-async def on_message(message):
-    await bot.process_commands(message)
+    await bot.change_presence(status=discord.Status.online, activity=discord.Activity(type=discord.ActivityType.watching, name="a TRAMA | /ajuda"))
 
 @bot.tree.command(name="ajuda", description="Mostra o painel de ajuda do Surf Trama")
 async def ajuda(interaction: discord.Interaction):
@@ -411,4 +406,7 @@ if __name__ == "__main__":
     if not TOKEN:
         print("⚠️ Defina a variável DISCORD_TOKEN no painel do Render.")
     else:
+        # Inicia o servidor web em uma thread separada ANTES do bot
+        keep_alive()
+        # Inicia o bot
         bot.run(TOKEN)
