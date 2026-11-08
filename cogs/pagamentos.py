@@ -57,7 +57,7 @@ class Pagamentos(commands.Cog):
         try:
             await interaction.channel.purge(limit=50, check=is_old_panel)
         except:
-            pass # Se não tiver permissão para apagar, ignora
+            pass
 
         embed = discord.Embed(title=textos["titulo"], description=textos["desc"], color=discord.Color.gold())
         if imagem: embed.set_image(url=imagem)
@@ -66,18 +66,23 @@ class Pagamentos(commands.Cog):
         await interaction.channel.send(embed=embed, view=BotaoComprarVIP())
 
     async def gerar_pix_syncpay(self, interaction: discord.Interaction, public_token: str, secret_token: str, valor: float):
+        # URL baseada nos exemplos da comunidade
         url = "https://api.syncpay.pro/v1/gateway/api/pix/cashIn"
         
+        # Payload baseado na biblioteca oficial: usa 'customer' e 'postbackUrl'
         payload = {
             "amount": valor,
-            "client": {
+            "description": "Pagamento VIP TRAMA",
+            "customer": {
                 "name": interaction.user.name,
                 "email": f"{interaction.user.id}@discord.com",
-                "cpf": "00000000000"
+                "cpf": "00000000000",
+                "phone": "11999999999"
             },
-            "webhook_url": "https://seu-site.onrender.com/webhook"
+            "postbackUrl": "https://seu-site.onrender.com/webhook"
         }
         
+        # Headers: A biblioteca usa client_id/client_secret, mas vamos tentar o padrão de mercado primeiro
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {secret_token}",
@@ -89,6 +94,7 @@ class Pagamentos(commands.Cog):
             response.raise_for_status()
             dados = response.json()
             
+            # DIAGNÓSTICO POR DM
             try:
                 await interaction.user.send(f"🔍 **Diagnóstico SyncPay:**\n```json\n{json.dumps(dados, indent=2)}\n```")
             except: pass
@@ -138,9 +144,9 @@ class ModalConfigurarMensagens(discord.ui.Modal, title="Personalizar Mensagens V
 # --- BOTÕES PERSISTENTES ---
 class BotaoComprarVIP(discord.ui.View):
     def __init__(self): 
-        super().__init__(timeout=None) # <--- ISSO FAZ O BOTÃO FUNCIONAR PARA SEMPRE
+        super().__init__(timeout=None)
 
-    @discord.ui.button(label="Comprar VIP", style=discord.ButtonStyle.success, emoji="💎", custom_id="btn_comprar_vip_v13")
+    @discord.ui.button(label="Comprar VIP", style=discord.ButtonStyle.success, emoji="💎", custom_id="btn_comprar_vip_v14")
     async def comprar(self, interaction: discord.Interaction, button: discord.ui.Button):
         cog = interaction.client.get_cog("Pagamentos")
         textos = cog.get_textos(interaction.guild_id)
@@ -165,17 +171,17 @@ class BotaoComprarVIP(discord.ui.View):
 
 class MenuPlanos(discord.ui.View):
     def __init__(self): 
-        super().__init__(timeout=None) # <--- ISSO FAZ OS BOTÕES DE PLANOS FUNCIONAREM PARA SEMPRE
+        super().__init__(timeout=None)
 
-    @discord.ui.button(label="VIP Básico - R$ 9,90", style=discord.ButtonStyle.secondary, emoji="🥉", custom_id="btn_plano_basico_v13")
+    @discord.ui.button(label="VIP Básico - R$ 9,90", style=discord.ButtonStyle.secondary, emoji="🥉", custom_id="btn_plano_basico_v14")
     async def plano_basico(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.processar_pagamento(interaction, 9.90, "Básico")
 
-    @discord.ui.button(label="VIP Premium - R$ 19,90", style=discord.ButtonStyle.primary, emoji="🥈", custom_id="btn_plano_premium_v13")
+    @discord.ui.button(label="VIP Premium - R$ 19,90", style=discord.ButtonStyle.primary, emoji="🥈", custom_id="btn_plano_premium_v14")
     async def plano_premium(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.processar_pagamento(interaction, 19.90, "Premium")
 
-    @discord.ui.button(label="VIP Master - R$ 29,90", style=discord.ButtonStyle.success, emoji="🥇", custom_id="btn_plano_master_v13")
+    @discord.ui.button(label="VIP Master - R$ 29,90", style=discord.ButtonStyle.success, emoji="🥇", custom_id="btn_plano_master_v14")
     async def plano_master(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.processar_pagamento(interaction, 29.90, "Master")
 
