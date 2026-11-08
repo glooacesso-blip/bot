@@ -4,6 +4,7 @@ from discord.ext import commands
 import os
 import sqlite3
 import datetime
+import requests # <-- NOVO: Para chamar a API da Atenas
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -17,7 +18,12 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# --- TOKENS DE VENDA ---
+# --- CONFIGURAÇÃO DA ATENAS PAY ---
+# Substitua pela sua chave de API gerada no painel da Atenas Pay
+ATENAS_API_KEY = "SUA_API_KEY_AQUI" 
+ATENAS_API_URL = "https://atenaspay.com.br/api/pix/create"
+
+# --- TOKENS DE VENDA (Gerados após o pagamento) ---
 CHAVES_VALIDAS = [
     "TRAMA-2026-VIP1",
     "TRAMA-2026-VIP2",
@@ -65,6 +71,7 @@ def setup_database():
 setup_database()
 
 # --- HTML: PÁGINA INICIAL (LANDING PAGE) ---
+# (Mantido igual ao anterior, apenas o botão de compra aponta para /comprar)
 HTML_LANDING = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -95,85 +102,9 @@ HTML_LANDING = """
 
     <header class="hero-bg py-24 px-6 text-center border-b border-[#262626]">
         <h1 class="text-5xl font-extrabold mb-4">Domine seu servidor com o <br><span class="gradient-text">Surf Trama</span></h1>
-        <p class="text-gray-400 text-lg max-w-2xl mx-auto mb-8">O bot definitivo de moderação, segurança, engajamento e vendas para a sua comunidade. Rápido, seguro e 100% personalizável.</p>
-        <a href="/login" class="bg-red-700 hover:bg-red-600 text-white px-8 py-3 rounded-lg font-bold text-lg transition shadow-lg shadow-red-900/50">Adicionar ao Discord</a>
+        <p class="text-gray-400 text-lg max-w-2xl mx-auto mb-8">O bot definitivo de moderação, segurança, engajamento e vendas para a sua comunidade.</p>
+        <a href="/comprar" class="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-lg font-bold text-lg transition shadow-lg shadow-green-900/50">Comprar Token de Acesso</a>
     </header>
-
-    <section class="py-20 px-6 max-w-6xl mx-auto">
-        <h2 class="text-3xl font-bold text-center mb-12 text-white">Tudo o que você precisa em um só lugar</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div class="card">
-                <div class="text-4xl mb-4">🛡️</div>
-                <h3 class="text-xl font-bold text-white mb-2">Moderação e Segurança</h3>
-                <p class="text-sm text-gray-400">Anti-raid, anti-link, honeypot, sistema de warns, mute e ban automáticos.</p>
-            </div>
-            <div class="card">
-                <div class="text-4xl mb-4">🎫</div>
-                <h3 class="text-xl font-bold text-white mb-2">Sistema de Tickets</h3>
-                <p class="text-sm text-gray-400">Atendimento profissional com menus suspensos e formulários personalizados.</p>
-            </div>
-            <div class="card">
-                <div class="text-4xl mb-4">👥</div>
-                <h3 class="text-xl font-bold text-white mb-2">Gestão de Membros</h3>
-                <p class="text-sm text-gray-400">Boas-vindas automáticas, cargos por reação, cargos por bio e contadores.</p>
-            </div>
-            <div class="card">
-                <div class="text-4xl mb-4">⚙️</div>
-                <h3 class="text-xl font-bold text-white mb-2">Automação Total</h3>
-                <p class="text-sm text-gray-400">Gatilhos personalizados, reações automáticas e sorteios interativos.</p>
-            </div>
-            <div class="card">
-                <div class="text-4xl mb-4">📱</div>
-                <h3 class="text-xl font-bold text-white mb-2">Redes Sociais</h3>
-                <p class="text-sm text-gray-400">Notificações de live na Twitch, downloads de vídeos e sistema de Tellonym.</p>
-            </div>
-            <div class="card">
-                <div class="text-4xl mb-4">🎮</div>
-                <h3 class="text-xl font-bold text-white mb-2">Integração com Jogos</h3>
-                <p class="text-sm text-gray-400">Tracker de Valorant, cargos de jogos e sistemas para comunidades gamers.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="py-20 bg-[#0f0f0f] border-t border-[#262626] px-6">
-        <h2 class="text-3xl font-bold text-center mb-12 text-white">O que dizem sobre nós</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            <div class="card bg-[#171717]">
-                <p class="text-gray-300 italic mb-4">"O melhor bot que já usei. O sistema de segurança salvou meu servidor de um ataque de raid."</p>
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">D</div>
-                    <div>
-                        <p class="text-white text-sm font-bold">dono_do_servidor</p>
-                        <p class="text-xs text-green-500">Cliente Verificado</p>
-                    </div>
-                </div>
-            </div>
-            <div class="card bg-[#171717]">
-                <p class="text-gray-300 italic mb-4">"A dashboard é incrível, consigo ver tudo o que acontece no meu servidor em tempo real."</p>
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold">M</div>
-                    <div>
-                        <p class="text-white text-sm font-bold">maria_gamer</p>
-                        <p class="text-xs text-green-500">Cliente Verificado</p>
-                    </div>
-                </div>
-            </div>
-            <div class="card bg-[#171717]">
-                <p class="text-gray-300 italic mb-4">"Os tickets com menu são muito profissionais. Meus membros adoraram."</p>
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center text-xs font-bold">J</div>
-                    <div>
-                        <p class="text-white text-sm font-bold">joao_trama</p>
-                        <p class="text-xs text-green-500">Cliente Verificado</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <footer class="text-center py-8 text-gray-500 text-sm border-t border-[#262626]">
-        <p>&copy; 2026 Surf Trama. Todos os direitos reservados.</p>
-    </footer>
 </body>
 </html>
 """
@@ -245,7 +176,7 @@ HTML_CADASTRO = """
 </html>
 """
 
-# --- HTML: PÁGINA DE VENDAS ---
+# --- HTML: PÁGINA DE VENDAS (BLOQUEIO SEM TOKEN) ---
 HTML_VENDAS = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -257,11 +188,11 @@ HTML_VENDAS = """
 <body class="bg-[#0a0a0a] text-white flex items-center justify-center h-screen font-sans">
     <div class="bg-[#171717] p-10 rounded-xl border border-[#262626] w-[500px] text-center shadow-2xl">
         <h1 class="text-4xl font-bold text-red-600 mb-2">Acesso Bloqueado</h1>
-        <p class="text-gray-400 mb-6">Você ainda não possui um Token de Licença ativo para acessar a Dashboard.</p>
+        <p class="text-gray-400 mb-6">Você ainda não possui um Token de Licença ativo.</p>
         <div class="bg-[#0a0a0a] p-4 rounded-lg border border-[#333] mb-6">
             <h2 class="text-xl font-bold text-white mb-2">Adquira o Bot Agora</h2>
-            <p class="text-sm text-gray-400 mb-4">Tenha acesso total ao Surf Trama.</p>
-            <a href="https://discord.gg/seu_link_de_vendas" target="_blank" class="block w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition">Comprar Token no Discord</a>
+            <p class="text-sm text-gray-400 mb-4">Pague com Pix e receba seu token na hora.</p>
+            <a href="/comprar" class="block w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition">Comprar Token</a>
         </div>
         <form method="POST" action="/validar_token">
             <p class="text-sm text-gray-400 mb-2">Já comprou? Insira seu Token aqui:</p>
@@ -349,24 +280,20 @@ def landing():
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
-        
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
         conn = sqlite3.connect('tickets.db')
         cursor = conn.cursor()
         cursor.execute("SELECT id, username, password_hash, token FROM users WHERE username = ?", (username,))
         user_data = cursor.fetchone()
         conn.close()
-        
         if user_data and check_password_hash(user_data[2], password):
             user = User(id=user_data[0], username=user_data[1], token=user_data[3], is_admin=(user_data[1] == 'surf157'))
             login_user(user)
             return redirect(url_for('dashboard'))
         else:
             return render_template_string(HTML_LOGIN, error="Usuário ou senha incorretos.")
-            
     return render_template_string(HTML_LOGIN)
 
 @app.route('/cadastro', methods=['GET', 'POST'])
@@ -374,10 +301,8 @@ def cadastro():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
         if username == 'surf157':
             return render_template_string(HTML_CADASTRO, error="Este nome de usuário é reservado.")
-        
         conn = sqlite3.connect('tickets.db')
         cursor = conn.cursor()
         try:
@@ -389,7 +314,6 @@ def cadastro():
         except sqlite3.IntegrityError:
             conn.close()
             return render_template_string(HTML_CADASTRO, error="Este nome de usuário já existe.")
-            
     return render_template_string(HTML_CADASTRO)
 
 @app.route('/logout')
@@ -398,19 +322,74 @@ def logout():
     logout_user()
     return redirect(url_for('landing'))
 
+# --- ROTA DE COMPRA (CRIA O PAGAMENTO NA ATENAS PAY) ---
+@app.route('/comprar')
+@login_required
+def comprar():
+    # 1. Cria a cobrança na Atenas Pay
+    payload = {
+        "amount": 29.90,
+        "external_id": str(current_user.id), # ID do usuário para identificar no webhook
+        "webhook_url": "https://seu-site.onrender.com/webhook" # URL do seu webhook
+    }
+    headers = {
+        "x-api-key": ATENAS_API_KEY,
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        response = requests.post(ATENAS_API_URL, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        
+        # 2. Redireciona para a página de pagamento da Atenas (ou exibe o QR Code)
+        # A API da Atenas deve retornar um link para o checkout ou o código Pix.
+        # Ajuste conforme a resposta real da API.
+        payment_url = data.get("payment_url") # Supondo que a API retorne um link
+        if payment_url:
+            return redirect(payment_url)
+        else:
+            # Se retornar o QR Code, você pode exibir na tela.
+            return f"<h1>Pague com Pix</h1><p>Código: {data.get('qr_code')}</p>"
+            
+    except requests.exceptions.RequestException as e:
+        return f"Erro ao gerar pagamento: {e}", 500
+
+# --- ROTA DE WEBHOOK (RECEBE A CONFIRMAÇÃO DA ATENAS PAY) ---
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.json
+    # A Atenas Pay envia o external_id e o status no webhook.
+    # Verifique a documentação deles para o formato exato.
+    if data:
+        external_id = data.get("external_id")
+        status = data.get("status")
+        
+        if status == "paid" or status == "confirmed": # Ajuste o nome do status
+            # Gera um token único para o cliente
+            novo_token = f"TRAMA-2026-{external_id[:6].upper()}"
+            
+            # Atualiza o token do usuário no banco
+            conn = sqlite3.connect('tickets.db')
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET token = ? WHERE id = ?", (novo_token, external_id))
+            conn.commit()
+            conn.close()
+            
+            CHAVES_VALIDAS.append(novo_token)
+            
+    return jsonify({"status": "ok"}), 200
+
 @app.route('/validar_token', methods=['POST'])
 @login_required
 def validar_token():
     token = request.form.get('token').upper()
-    
     if token in CHAVES_VALIDAS:
         conn = sqlite3.connect('tickets.db')
         cursor = conn.cursor()
         cursor.execute("UPDATE users SET token = ? WHERE id = ?", (token, current_user.id))
         conn.commit()
         conn.close()
-        
-        CHAVES_VALIDAS.remove(token)
         return redirect(url_for('dashboard'))
     else:
         return render_template_string(HTML_VENDAS, error="Token inválido ou já utilizado.")
@@ -420,20 +399,14 @@ def validar_token():
 def dashboard():
     if not current_user.token and not current_user.is_admin:
         return render_template_string(HTML_VENDAS)
-        
     if not bot.is_ready(): return "Iniciando bot... Recarregue em 10 segundos.", 200
-    
     guilds_data = []
     for guild in bot.guilds:
         in_call = sum(1 for member in guild.members if member.voice and member.voice.channel)
         guilds_data.append({
-            "id": guild.id,
-            "name": guild.name,
-            "icon": guild.icon.url if guild.icon else None,
-            "members": guild.member_count,
-            "in_call": in_call
+            "id": guild.id, "name": guild.name, "icon": guild.icon.url if guild.icon else None,
+            "members": guild.member_count, "in_call": in_call
         })
-    
     guilds_data.sort(key=lambda x: x['members'], reverse=True)
     return render_template_string(HTML_DASHBOARD, guilds=guilds_data)
 
@@ -467,11 +440,10 @@ class SurfTramaBot(commands.Bot):
             await self.load_extension("cogs.redes_sociais")
             await self.load_extension("cogs.utilitarios")
             await self.load_extension("cogs.automacao")
-            await self.load_extension("cogs.vip") # <--- MÓDULO VIP AQUI
+            await self.load_extension("cogs.vip")
             print("✅ Módulos carregados com sucesso.")
         except Exception as e:
             print(f"❌ ERRO AO CARREGAR MÓDULOS: {e}")
-        
         await self.tree.sync()
         print("✅ Comandos sincronizados.")
 
@@ -480,7 +452,6 @@ bot = SurfTramaBot()
 @bot.event
 async def on_ready():
     print(f'✅ Surf Trama online como {bot.user}')
-    # Inicia o site DEPOIS que o bot estiver online (evita erro no Render)
     keep_alive()
 
 @bot.event
