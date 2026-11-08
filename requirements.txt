@@ -1,9 +1,9 @@
-aiohttp
 discord.py
 flask
 flask-login
 instagrapi
-requests
 tweepy
 twitchAPI
-werkzeug
+aiohttp
+requests
+py-sonora
