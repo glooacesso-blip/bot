@@ -377,7 +377,7 @@ class SurfTramaBot(commands.Bot):
             await self.load_extension("cogs.utilitarios")
             await self.load_extension("cogs.automacao")
             await self.load_extension("cogs.vip")
-            await self.load_extension("cogs.pagamentos") # <--- MÓDULO DE PAGAMENTO
+            await self.load_extension("cogs.pagamentos") # <--- MÓDULO DE PAGAMENTO (SYNCPAY)
             await self.load_extension("cogs.musica")     # <--- MÓDULO DE MÚSICA
             print("✅ Módulos carregados com sucesso.")
         except Exception as e:
