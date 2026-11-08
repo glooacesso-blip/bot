@@ -4,14 +4,72 @@ from discord.ext import commands
 import os
 import sqlite3
 import datetime
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from threading import Thread
 
 # --- Configuração do Servidor Web ---
-app = Flask('')
-SENHA_ADMIN = "trama123"
+app = Flask(__name__)
+app.secret_key = 'chave_super_secreta_trama_2026' # Necessário para o login funcionar
 
-# --- HTML DO SITE (DASHBOARD FUNCIONAL) ---
+# Configuração do Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# Usuário Admin (Você pode mudar aqui)
+ADMIN_USER = "surf157"
+ADMIN_PASS = "surf"
+
+class User(UserMixin):
+    def __init__(self, id):
+        self.id = id
+
+@login_manager.user_loader
+def load_user(user_id):
+    if user_id == ADMIN_USER:
+        return User(user_id)
+    return None
+
+# --- HTML DO SITE (DASHBOARD) ---
+HTML_LOGIN = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Surf Trama | Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>body { background-color: #0a0a0a; color: #fff; font-family: sans-serif; }</style>
+</head>
+<body class="flex items-center justify-center h-screen">
+    <div class="bg-[#171717] p-8 rounded-xl border border-[#262626] w-96 shadow-2xl">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-red-600">🌊 Surf Trama</h1>
+            <p class="text-gray-400 text-sm mt-2">Acesso Restrito à Administração</p>
+        </div>
+        {% if error %}
+        <div class="bg-red-900/50 border border-red-500 text-red-300 p-3 rounded mb-4 text-sm text-center">
+            {{ error }}
+        </div>
+        {% endif %}
+        <form method="POST" action="/login">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-400 mb-2">Usuário</label>
+                <input type="text" name="username" class="w-full bg-[#0a0a0a] border border-[#333] rounded p-2 text-white focus:outline-none focus:border-red-500" required>
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-400 mb-2">Senha</label>
+                <input type="password" name="password" class="w-full bg-[#0a0a0a] border border-[#333] rounded p-2 text-white focus:outline-none focus:border-red-500" required>
+            </div>
+            <button type="submit" class="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition duration-200">
+                Entrar no Painel
+            </button>
+        </form>
+    </div>
+</body>
+</html>
+"""
+
 HTML_DASHBOARD = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -20,146 +78,75 @@ HTML_DASHBOARD = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surf Trama | Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #e5e7eb; }
-        .card { background-color: #171717; border: 1px solid #262626; border-radius: 12px; padding: 20px; }
-        .stat-value { font-size: 32px; font-weight: 600; color: #fff; }
-        .stat-label { font-size: 14px; color: #a3a3a3; }
-        .sidebar-item { display: flex; align-items: center; padding: 10px 15px; border-radius: 8px; color: #a3a3a3; transition: 0.2s; cursor: pointer; }
-        .sidebar-item:hover { background-color: #262626; color: #fff; }
-        .sidebar-item.active { background-color: #8B0000; color: #fff; }
+        .card { background-color: #171717; border: 1px solid #262626; border-radius: 12px; padding: 20px; transition: 0.2s; }
+        .card:hover { border-color: #8B0000; transform: translateY(-2px); }
+        .stat-value { font-size: 28px; font-weight: 600; color: #fff; }
+        .stat-label { font-size: 13px; color: #a3a3a3; }
+        .server-icon { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #262626; }
     </style>
 </head>
-<body class="flex h-screen overflow-hidden">
-    <!-- Sidebar -->
-    <aside class="w-64 bg-[#0a0a0a] border-r border-[#262626] flex flex-col p-4">
-        <div class="flex items-center gap-3 mb-8 px-2">
-            <div class="w-8 h-8 rounded-full bg-[#8B0000] flex items-center justify-center font-bold text-white">T</div>
-            <div>
-                <h1 class="text-white font-bold">TRAMA</h1>
-                <p class="text-xs text-gray-500">Tools</p>
-            </div>
-        </div>
-        
-        <div class="mb-6">
-            <p class="text-xs font-semibold text-gray-500 mb-2 px-2">CONTA SELECIONADA</p>
-            <div class="sidebar-item active">
-                <div class="w-6 h-6 rounded-full bg-gray-600 mr-2"></div>
-                <span>@SurfTramaBot</span>
-            </div>
-        </div>
-
-        <nav class="flex-1 space-y-1">
-            <p class="text-xs font-semibold text-gray-500 mb-2 px-2 mt-4">VISÃO GERAL</p>
-            <div class="sidebar-item"><span>📊 Inicio</span></div>
-            <div class="sidebar-item"><span>⏱️ Presença</span></div>
-            <div class="sidebar-item"><span>🎮 Atividade</span></div>
-            
-            <p class="text-xs font-semibold text-gray-500 mb-2 px-2 mt-4">CONTA</p>
-            <div class="sidebar-item"><span>👥 Contas</span></div>
-            <div class="sidebar-item"><span>🚀 HypeSquad</span></div>
-        </nav>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto p-8">
-        <div class="flex justify-between items-center mb-8">
-            <div>
-                <h2 class="text-2xl font-bold text-white">Visão geral</h2>
-                <p class="text-sm text-gray-400">Atividade registrada do servidor TRAMA.</p>
-            </div>
+<body class="p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-10 pb-6 border-b border-[#262626]">
             <div class="flex items-center gap-4">
-                <a href="/sair" class="text-sm text-red-500 hover:text-red-400">Sair do Servidor</a>
-                <div class="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center">👑</div>
-            </div>
-        </div>
-
-        <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="card">
-                <p class="stat-label flex items-center gap-2">💬 Mensagens Registradas</p>
-                <p class="stat-value mt-2">{{ total_mensagens }}</p>
-            </div>
-            <div class="card">
-                <p class="stat-label flex items-center gap-2">💬 Mensagens - 30 dias</p>
-                <p class="stat-value mt-2">{{ mensagens_30d }}</p>
-            </div>
-            <div class="card">
-                <p class="stat-label flex items-center gap-2">🎧 Tempo em call (Total)</p>
-                <p class="stat-value mt-2">{{ tempo_call }}</p>
-            </div>
-        </div>
-
-        <!-- Gráfico -->
-        <div class="card mb-8">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-white font-semibold">Atividade (Mensagens/Dia)</h3>
-            </div>
-            <div class="h-64">
-                <canvas id="activityChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Onde você mais fica em call -->
-        <div class="card mb-8">
-            <h3 class="text-white font-semibold mb-4">Canais mais usados (Call)</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {% for canal in canais_top %}
-                <div class="bg-[#262626] p-4 rounded-lg flex items-center justify-between">
-                    <div>
-                        <p class="text-xs text-gray-400">{{ canal.nome }}</p>
-                        <p class="text-white font-bold text-sm">{{ canal.tempo }}</p>
-                    </div>
-                    <span class="text-xl">🎧</span>
+                <div class="w-12 h-12 rounded-full bg-red-700 flex items-center justify-center font-bold text-white text-xl">T</div>
+                <div>
+                    <h1 class="text-2xl font-bold text-white">Surf Trama Dashboard</h1>
+                    <p class="text-sm text-gray-400">Bem-vindo, Administrador</p>
                 </div>
-                {% endfor %}
             </div>
+            <a href="/logout" class="bg-[#262626] hover:bg-red-900 text-white px-4 py-2 rounded-lg text-sm transition">Sair do Painel</a>
         </div>
 
-        <!-- Top Servidores -->
-        <div class="card">
-            <h3 class="text-white font-semibold mb-2">Top Servidores</h3>
-            <div class="flex justify-between items-center py-2 border-b border-[#262626]">
-                <span class="text-sm text-gray-300">{{ top_server_nome }}</span>
-                <span class="text-sm font-bold text-white">{{ total_mensagens }}</span>
+        <!-- Servidores -->
+        <h2 class="text-xl font-semibold text-white mb-4">📡 Servidores Conectados ({{ guilds|length }})</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+            {% for guild in guilds %}
+            <div class="card">
+                <div class="flex items-center gap-4 mb-4">
+                    {% if guild.icon %}
+                        <img src="{{ guild.icon }}" alt="Logo" class="server-icon">
+                    {% else %}
+                        <div class="server-icon bg-gray-700 flex items-center justify-center text-xs">TRAMA</div>
+                    {% endif %}
+                    <div>
+                        <h3 class="font-bold text-white text-lg truncate w-40">{{ guild.name }}</h3>
+                        <p class="text-xs text-gray-500">ID: {{ guild.id }}</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mt-4">
+                    <div class="bg-[#0a0a0a] p-3 rounded-lg text-center border border-[#262626]">
+                        <p class="stat-label">👥 Membros</p>
+                        <p class="stat-value">{{ guild.members }}</p>
+                    </div>
+                    <div class="bg-[#0a0a0a] p-3 rounded-lg text-center border border-[#262626]">
+                        <p class="stat-label">🎧 Em Call</p>
+                        <p class="stat-value text-green-500">{{ guild.in_call }}</p>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card text-center col-span-3">
+                <p class="text-gray-400">O bot ainda não foi adicionado a nenhum servidor.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Status do Bot -->
+        <div class="card bg-gradient-to-r from-[#171717] to-[#1a0000]">
+            <h3 class="text-white font-semibold mb-2">🤖 Status do Bot</h3>
+            <p class="text-sm text-gray-400">O bot está online e operando em {{ guilds|length }} servidor(es).</p>
+            <div class="mt-4 flex gap-2">
+                <span class="bg-green-900/50 text-green-400 text-xs px-2 py-1 rounded border border-green-800">Online</span>
+                <span class="bg-gray-800 text-gray-300 text-xs px-2 py-1 rounded">Versão 2.0</span>
             </div>
         </div>
-    </main>
-
-    <script>
-        // Puxa os dados reais da API do Flask
-        fetch('/api/chart_data')
-            .then(response => response.json())
-            .then(data => {
-                const ctx = document.getElementById('activityChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: data.labels,
-                        datasets: [{
-                            label: 'Mensagens',
-                            data: data.values,
-                            borderColor: '#8B0000',
-                            backgroundColor: 'rgba(139, 0, 0, 0.1)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { grid: { color: '#262626' }, ticks: { color: '#a3a3a3' } },
-                            y: { grid: { color: '#262626' }, ticks: { color: '#a3a3a3' }, beginAtZero: true }
-                        }
-                    }
-                });
-            });
-    </script>
+    </div>
 </body>
 </html>
 """
@@ -176,76 +163,52 @@ def setup_database():
 setup_database()
 
 # --- Rotas do Site ---
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if username == ADMIN_USER and password == ADMIN_PASS:
+            user = User(username)
+            login_user(user)
+            return redirect(url_for('dashboard'))
+        else:
+            return render_template_string(HTML_LOGIN, error="Usuário ou senha incorretos.")
+            
+    return render_template_string(HTML_LOGIN)
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
 @app.route('/')
-def home():
+@login_required
+def dashboard():
     if not bot.is_ready(): return "Iniciando bot... Recarregue em 10 segundos.", 200
     
-    conn = sqlite3.connect('tickets.db')
-    cursor = conn.cursor()
-    
-    # 1. Total de mensagens
-    cursor.execute("SELECT COUNT(*) FROM estatisticas_mensagens")
-    total_msgs = cursor.fetchone()[0] or 0
-    
-    # 2. Mensagens nos últimos 30 dias
-    cursor.execute("SELECT COUNT(*) FROM estatisticas_mensagens WHERE data >= date('now', '-30 days')")
-    msgs_30d = cursor.fetchone()[0] or 0
-    
-    # 3. Tempo total em call
-    cursor.execute("SELECT SUM(tempo_segundos) FROM estatisticas_call")
-    total_segundos = cursor.fetchone()[0] or 0
-    horas = total_segundos // 3600
-    minutos = (total_segundos % 3600) // 60
-    tempo_call = f"{horas}h {minutos}m"
-
-    # 4. Canais mais usados
-    cursor.execute("SELECT channel_name, SUM(tempo_segundos) as total FROM estatisticas_call GROUP BY channel_name ORDER BY total DESC LIMIT 4")
-    canais_raw = cursor.fetchall()
-    canais_top = []
-    for nome, segundos in canais_raw:
-        h = segundos // 3600
-        m = (segundos % 3600) // 60
-        canais_top.append({"nome": nome, "tempo": f"{h}h {m}m"})
-    
-    # Se não tiver dados, mostra um padrão
-    if not canais_top:
-        canais_top = [{"nome": "Nenhum registro ainda", "tempo": "0h 0m"}]
-
-    # 5. Nome do servidor
-    top_server_nome = bot.guilds[0].name if bot.guilds else "Desconhecido"
-    
-    conn.close()
-    
-    return render_template_string(
-        HTML_DASHBOARD, 
-        total_mensagens=total_msgs, 
-        mensagens_30d=msgs_30d,
-        tempo_call=tempo_call,
-        canais_top=canais_top,
-        top_server_nome=top_server_nome
-    )
-
-@app.route('/api/chart_data')
-def chart_data():
-    # Rota que alimenta o gráfico com os últimos 10 dias de mensagens
-    conn = sqlite3.connect('tickets.db')
-    cursor = conn.cursor()
-    
-    labels = []
-    values = []
-    
-    for i in range(9, -1, -1): # Pega os últimos 10 dias
-        data_alvo = (datetime.datetime.now() - datetime.timedelta(days=i)).strftime("%Y-%m-%d")
-        labels.append(data_alvo[8:10] + "/" + data_alvo[5:7]) # Formato DD/MM
+    guilds_data = []
+    for guild in bot.guilds:
+        # Conta quantos estão em call (voice)
+        in_call = sum(1 for member in guild.members if member.voice and member.voice.channel)
         
-        cursor.execute("SELECT COUNT(*) FROM estatisticas_mensagens WHERE data LIKE ?", (f"{data_alvo}%",))
-        count = cursor.fetchone()[0] or 0
-        values.append(count)
-        
-    conn.close()
-    return jsonify({"labels": labels, "values": values})
+        guilds_data.append({
+            "id": guild.id,
+            "name": guild.name,
+            "icon": guild.icon.url if guild.icon else None,
+            "members": guild.member_count,
+            "in_call": in_call
+        })
+    
+    # Ordena pelo servidor com mais membros
+    guilds_data.sort(key=lambda x: x['members'], reverse=True)
+    
+    return render_template_string(HTML_DASHBOARD, guilds=guilds_data)
 
 @app.route('/sair')
+@login_required
 def sair_servidor():
     os._exit(0)
 
