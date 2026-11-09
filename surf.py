@@ -41,214 +41,234 @@ def load_user(user_id):
 def setup_database():
     conn = sqlite3.connect('tickets.db')
     cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT UNIQUE, password_hash TEXT, token TEXT)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT UNIQUE, password_hash TEXT, token TEXT, created_at TEXT)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS estatisticas (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, user_id TEXT, user_name TEXT, guild_id TEXT, detalhe TEXT, data TEXT)''')
     cursor.execute("SELECT * FROM users WHERE username = 'surf157'")
     if not cursor.fetchone():
-        cursor.execute("INSERT INTO users (username, email, password_hash, token) VALUES (?, ?, ?, ?)", ('surf157', 'admin@trama.com', generate_password_hash('surf'), 'ADMIN-MASTER-TOKEN'))
+        agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+        cursor.execute("INSERT INTO users (username, email, password_hash, token, created_at) VALUES (?, ?, ?, ?, ?)", ('surf157', 'admin@trama.com', generate_password_hash('surf'), 'ADMIN-MASTER-TOKEN', agora))
     conn.commit()
     conn.close()
 
 setup_database()
 
-# --- ESTILOS E ANIMAÇÕES GLOBAIS ---
+# --- ESTILOS GLOBAIS ---
 GLOBAL_STYLE = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
     * { font-family: 'Outfit', sans-serif; }
-    body { background-color: #050505; color: #e5e7eb; margin: 0; overflow-x: hidden; }
+    body { background-color: #050505; color: #e5e7eb; margin: 0; overflow-x: hidden; display: flex; height: 100vh; }
+    
     .bg-blobs { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; overflow: hidden; }
-    .blob { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.4; animation: move 20s infinite alternate; }
+    .blob { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.2; animation: move 20s infinite alternate; }
     .blob-1 { width: 400px; height: 400px; background: #8B0000; top: -100px; left: -100px; }
     .blob-2 { width: 300px; height: 300px; background: #ff3333; bottom: -50px; right: -50px; animation-delay: -5s; }
-    .blob-3 { width: 200px; height: 200px; background: #4a0000; top: 40%; left: 40%; animation-delay: -10s; }
     @keyframes move { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(100px, 50px) scale(1.2); } }
-    .glass { background: rgba(23, 23, 23, 0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 20px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); }
+
+    .glass { background: rgba(23, 23, 23, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); }
     .fade-up { animation: fadeUp 0.8s ease-out forwards; opacity: 0; transform: translateY(20px); }
     @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
-    .btn-primary { background: linear-gradient(135deg, #8B0000, #ff3333); color: white; padding: 12px 24px; border-radius: 10px; font-weight: 600; transition: all 0.3s ease; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(139, 0, 0, 0.4); }
-    .marquee-container { overflow: hidden; white-space: nowrap; position: relative; width: 100%; mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); }
-    .marquee-content { display: inline-flex; gap: 20px; animation: marquee 30s linear infinite; }
-    .marquee-content:hover { animation-play-state: paused; }
-    @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-    .review-card { display: inline-block; white-space: normal; width: 320px; flex-shrink: 0; text-align: left; }
+    .btn-primary { background: linear-gradient(135deg, #8B0000, #ff3333); color: white; padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: 0.3s; border: none; cursor: pointer; text-decoration: none; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(139, 0, 0, 0.4); }
+    
+    /* Sidebar Estilo */
+    .sidebar { width: 260px; background: rgba(10, 10, 10, 0.8); border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; padding: 20px; backdrop-filter: blur(10px); }
+    .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px; color: #a3a3a3; font-weight: 500; cursor: pointer; transition: 0.2s; margin-bottom: 5px; }
+    .sidebar-item:hover { background: rgba(255,255,255,0.05); color: white; }
+    .sidebar-item.active { background: rgba(139, 0, 0, 0.2); color: #ff3333; border-left: 3px solid #ff3333; }
+    
+    .tab-content { display: none; animation: fadeUp 0.4s ease-out; }
+    .tab-content.active { display: block; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th { text-align: left; padding: 12px; color: #888; font-size: 12px; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 14px; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
 </style>
 """
 
-# --- HTML: LANDING PAGE ---
-HTML_LANDING = f"""
+# --- HTML: DASHBOARD COM SIDEBAR ---
+HTML_DASHBOARD = f"""
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Surf Trama | O Melhor Bot para o seu Servidor</title>
+    <title>Dashboard | Surf Trama</title>
     <script src="https://cdn.tailwindcss.com"></script>
     {GLOBAL_STYLE}
 </head>
 <body>
-    <div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div></div>
+    <div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div></div>
 
-    <nav class="flex justify-between items-center p-6 max-w-7xl mx-auto fade-up">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-700 to-red-500 flex items-center justify-center font-bold text-white text-xl shadow-lg shadow-red-900/50">T</div>
-            <span class="text-2xl font-extrabold tracking-tight text-white">Surf Trama</span>
+    <!-- Sidebar -->
+    <aside class="sidebar fade-up">
+        <div class="flex items-center gap-3 mb-10 px-2">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-700 to-red-500 flex items-center justify-center font-bold text-white text-xl">T</div>
+            <span class="text-xl font-extrabold text-white">Surf Trama</span>
         </div>
-        <div class="flex items-center gap-4">
-            <a href="/login" class="text-gray-300 hover:text-white font-semibold transition">Entrar</a>
-            <a href="/cadastro" class="btn-primary text-sm">Criar Conta</a>
+
+        <nav class="flex-1">
+            <p class="text-xs font-bold text-gray-600 mb-3 px-2 uppercase tracking-wider">Menu Principal</p>
+            <div class="sidebar-item active" onclick="openTab('visao-geral', this)">📊 Visão Geral</div>
+            <div class="sidebar-item" onclick="openTab('tickets', this)">🎫 Tickets</div>
+            <div class="sidebar-item" onclick="openTab('vendas', this)">💎 Vendas VIP</div>
+            <div class="sidebar-item" onclick="openTab('pagamentos', this)">💳 Pagamentos</div>
+            
+            {{% if current_user.is_admin %}}
+            <p class="text-xs font-bold text-gray-600 mb-3 px-2 mt-6 uppercase tracking-wider">Administração</p>
+            <div class="sidebar-item" onclick="openTab('usuarios', this)">👥 Usuários</div>
+            <div class="sidebar-item" onclick="openTab('servidores', this)">📡 Servidores</div>
+            {{% endif %}}
+        </nav>
+
+        <div class="mt-auto pt-6 border-t border-white/5">
+            <div class="flex items-center gap-3 mb-4 px-2">
+                <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs">{{{{ current_user.username[0]|upper }}}}</div>
+                <div>
+                    <p class="text-sm font-bold text-white">{{{{ current_user.username }}}}</p>
+                    <p class="text-xs text-gray-500">{{% if current_user.is_admin %}}Administrador{{% else %}}Cliente{{% endif %}}</p>
+                </div>
+            </div>
+            <a href="/logout" class="sidebar-item text-red-500 hover:text-red-400 hover:bg-red-900/20">🚪 Sair da Conta</a>
         </div>
-    </nav>
+    </aside>
 
-    <header class="text-center py-24 px-6 max-w-4xl mx-auto fade-up" style="animation-delay: 0.2s;">
-        <h1 class="text-5xl md:text-7xl font-extrabold mb-6 leading-tight tracking-tight">
-            Domine seu servidor com <span class="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-800">inteligência</span>.
-        </h1>
-        <p class="text-gray-400 text-lg md:text-xl mb-10 max-w-2xl mx-auto">
-            Moderação impecável, engajamento automatizado, vendas integradas e uma dashboard linda. Tudo em um único bot.
-        </p>
-        <a href="/cadastro" class="btn-primary text-lg px-10 py-4">Começar Agora</a>
-    </header>
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-10">
+        
+        <!-- ABA: VISÃO GERAL -->
+        <div id="visao-geral" class="tab-content active fade-up">
+            <h1 class="text-3xl font-bold text-white mb-2">Visão Geral</h1>
+            <p class="text-gray-400 mb-8">Resumo em tempo real do seu bot.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="glass p-6 border-t-2 border-red-600"><p class="text-xs text-gray-400 uppercase mb-2">Servidores</p><p class="text-4xl font-extrabold text-white">{{{{ guilds|length }}}}</p></div>
+                <div class="glass p-6 border-t-2 border-green-600"><p class="text-xs text-gray-400 uppercase mb-2">Tickets</p><p class="text-4xl font-extrabold text-green-500">{{{{ total_tickets }}}}</p></div>
+                <div class="glass p-6 border-t-2 border-yellow-600"><p class="text-xs text-gray-400 uppercase mb-2">Cliques VIP</p><p class="text-4xl font-extrabold text-yellow-500">{{{{ total_vendas }}}}</p></div>
+                <div class="glass p-6 border-t-2 border-blue-600"><p class="text-xs text-gray-400 uppercase mb-2">Pix Gerados</p><p class="text-4xl font-extrabold text-blue-500">{{{{ total_pagamentos }}}}</p></div>
+            </div>
 
-    <!-- Funcionalidades -->
-    <section class="py-20 px-6 max-w-7xl mx-auto fade-up" style="animation-delay: 0.4s;">
-        <h2 class="text-3xl font-bold text-center mb-12 text-white">Tudo o que você precisa em um só lugar</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div class="glass p-6"><div class="text-4xl mb-4">🛡️</div><h3 class="text-xl font-bold text-white mb-2">Moderação e Segurança</h3><p class="text-sm text-gray-400">Anti-raid, anti-link, honeypot, sistema de warns, mute e ban automáticos.</p></div>
-            <div class="glass p-6"><div class="text-4xl mb-4">🎫</div><h3 class="text-xl font-bold text-white mb-2">Sistema de Tickets</h3><p class="text-sm text-gray-400">Atendimento profissional com menus suspensos e criação de canais privados.</p></div>
-            <div class="glass p-6"><div class="text-4xl mb-4">💎</div><h3 class="text-xl font-bold text-white mb-2">Vendas Automáticas</h3><p class="text-sm text-gray-400">Venda cargos VIP com integração de pagamento Pix (SyncPay) automática.</p></div>
-            <div class="glass p-6"><div class="text-4xl mb-4">👥</div><h3 class="text-xl font-bold text-white mb-2">Gestão de Membros</h3><p class="text-sm text-gray-400">Boas-vindas automáticas, cargos por reação e cargo automático ao entrar.</p></div>
-            <div class="glass p-6"><div class="text-4xl mb-4">⚙️</div><h3 class="text-xl font-bold text-white mb-2">Automação Total</h3><p class="text-sm text-gray-400">Gatilhos personalizados, reações automáticas e sorteios interativos.</p></div>
-            <div class="glass p-6"><div class="text-4xl mb-4">🎵</div><h3 class="text-xl font-bold text-white mb-2">Sistema de Música</h3><p class="text-sm text-gray-400">Toque músicas do YouTube e Spotify em alta qualidade com fila.</p></div>
-        </div>
-    </section>
-
-    <!-- Depoimentos -->
-    <section class="py-20 overflow-hidden fade-up" style="animation-delay: 0.6s;">
-        <h2 class="text-3xl font-bold text-center mb-12 text-white">O que dizem sobre nós</h2>
-        <div class="marquee-container">
-            <div class="marquee-content">
-                <!-- Grupo 1 -->
-                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"O melhor bot que já usei. O sistema de segurança salvou meu servidor de um ataque."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">D</div><p class="text-white text-sm font-bold">dono_server</p></div></div>
-                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"A dashboard é incrível, consigo ver tudo em tempo real. Vale cada centavo."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold">M</div><p class="text-white text-sm font-bold">maria_gamer</p></div></div>
-                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"Os tickets com menu são muito profissionais. Meus membros adoraram."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold">J</div><p class="text-white text-sm font-bold">joao_trama</p></div></div>
-                <!-- Grupo 2 (Cópia) -->
-                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"O melhor bot que já usei. O sistema de segurança salvou meu servidor de um ataque."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">D</div><p class="text-white text-sm font-bold">dono_server</p></div></div>
-                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"A dashboard é incrível, consigo ver tudo em tempo real. Vale cada centavo."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold">M</div><p class="text-white text-sm font-bold">maria_gamer</p></div></div>
-                <div class="review-card glass p-6"><div class="flex text-yellow-500 mb-2">★★★★★</div><p class="text-gray-300 text-sm mb-4">"Os tickets com menu são muito profissionais. Meus membros adoraram."</p><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold">J</div><p class="text-white text-sm font-bold">joao_trama</p></div></div>
+            <div class="glass p-6">
+                <h3 class="text-lg font-bold text-white mb-4">Atividades Recentes (Todos os módulos)</h3>
+                <table>
+                    <thead><tr><th>Tipo</th><th>Usuário</th><th>Detalhe</th><th>Data</th></tr></thead>
+                    <tbody>
+                        {{% for log in logs_recentes %}}
+                        <tr><td class="font-bold text-red-500">{{{{ log.tipo }}}}</td><td>{{{{ log.user_name }}}}</td><td>{{{{ log.detalhe }}}}</td><td class="text-gray-500">{{{{ log.data }}}}</td></tr>
+                        {{% endfor %}}
+                    </tbody>
+                </table>
             </div>
         </div>
-    </section>
 
-    <footer class="text-center py-8 text-gray-600 text-sm border-t border-[#262626]">
-        <p>&copy; 2026 Surf Trama. Todos os direitos reservados.</p>
-    </footer>
-</body>
-</html>
-"""
-
-# --- HTML: LOGIN ---
-HTML_LOGIN = f"""
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head><title>Login</title><script src="https://cdn.tailwindcss.com"></script>{GLOBAL_STYLE}</head>
-<body class="flex items-center justify-center h-screen">
-    <div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div></div>
-    <div class="glass p-10 w-[400px] fade-up">
-        <h1 class="text-2xl font-bold text-white text-center mb-6">Entrar no Painel</h1>
-        {{% if error %}}<div class="bg-red-900/50 text-red-300 p-2 rounded mb-4 text-center">{{{{ error }}}}</div>{{% endif %}}
-        <form method="POST" action="/login">
-            <div class="mb-4"><label class="text-xs text-gray-400 uppercase">Usuário</label><input type="text" name="username" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white focus:border-red-500 outline-none" required></div>
-            <div class="mb-6"><label class="text-xs text-gray-400 uppercase">Senha</label><input type="password" name="password" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white focus:border-red-500 outline-none" required></div>
-            <button type="submit" class="btn-primary w-full py-3">Entrar</button>
-        </form>
-        <p class="text-center text-sm text-gray-500 mt-4">Não tem conta? <a href="/cadastro" class="text-red-500">Criar Conta</a></p>
-    </div>
-</body>
-</html>
-"""
-
-# --- HTML: CADASTRO ---
-HTML_CADASTRO = f"""
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head><title>Cadastro</title><script src="https://cdn.tailwindcss.com"></script>{GLOBAL_STYLE}</head>
-<body class="flex items-center justify-center h-screen">
-    <div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div></div>
-    <div class="glass p-10 w-[400px] fade-up">
-        <h1 class="text-2xl font-bold text-white text-center mb-6">Crie sua Conta</h1>
-        {{% if error %}}<div class="bg-red-900/50 text-red-300 p-2 rounded mb-4 text-center">{{{{ error }}}}</div>{{% endif %}}
-        <form method="POST" action="/cadastro">
-            <div class="mb-4"><label class="text-xs text-gray-400 uppercase">Usuário</label><input type="text" name="username" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white focus:border-red-500 outline-none" required></div>
-            <div class="mb-4"><label class="text-xs text-gray-400 uppercase">E-mail</label><input type="email" name="email" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white focus:border-red-500 outline-none" placeholder="seu@email.com" required></div>
-            <div class="mb-6"><label class="text-xs text-gray-400 uppercase">Senha</label><input type="password" name="password" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white focus:border-red-500 outline-none" required></div>
-            <button type="submit" class="btn-primary w-full py-3">Cadastrar</button>
-        </form>
-        <p class="text-center text-sm text-gray-500 mt-4">Já tem conta? <a href="/login" class="text-red-500">Fazer Login</a></p>
-    </div>
-</body>
-</html>
-"""
-
-# --- HTML: DASHBOARD ---
-HTML_DASHBOARD = f"""
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head><title>Dashboard</title><script src="https://cdn.tailwindcss.com"></script>{GLOBAL_STYLE}</head>
-<body class="p-8">
-    <div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div></div>
-    <div class="max-w-6xl mx-auto fade-up">
-        <div class="flex justify-between items-center mb-10 glass p-4 rounded-2xl">
-            <div class="flex items-center gap-4">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-700 to-red-500 flex items-center justify-center font-bold text-white">T</div>
-                <div><h1 class="text-lg font-bold text-white">Dashboard</h1><p class="text-xs text-gray-400">Olá, {{{{ current_user.username }}}}</p></div>
+        <!-- ABA: TICKETS -->
+        <div id="tickets" class="tab-content">
+            <h1 class="text-3xl font-bold text-white mb-2">Histórico de Tickets</h1>
+            <p class="text-gray-400 mb-8">Quem abriu atendimento e quando.</p>
+            <div class="glass p-6">
+                <table>
+                    <thead><tr><th>Usuário</th><th>Assunto</th><th>Data</th></tr></thead>
+                    <tbody>
+                        {{% for log in logs_tickets %}}
+                        <tr><td class="font-bold text-white">{{{{ log.user_name }}}}</td><td class="text-gray-400">{{{{ log.detalhe }}}}</td><td class="text-gray-500">{{{{ log.data }}}}</td></tr>
+                        {{% else %}}<tr><td colspan="3" class="text-center text-gray-500">Nenhum ticket registrado.</td></tr>{{% endfor %}}
+                    </tbody>
+                </table>
             </div>
-            <a href="/logout" class="bg-white/5 hover:bg-red-900/50 border border-white/10 text-white px-4 py-2 rounded-lg text-sm transition">Sair</a>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div class="glass p-6 text-center border-t-2 border-red-600"><p class="text-xs text-gray-400 mb-1">Servidores</p><p class="text-4xl font-extrabold text-white">{{{{ guilds|length }}}}</p></div>
-            <div class="glass p-6 text-center border-t-2 border-green-600"><p class="text-xs text-gray-400 mb-1">Tickets</p><p class="text-4xl font-extrabold text-green-500">{{{{ total_tickets }}}}</p></div>
-            <div class="glass p-6 text-center border-t-2 border-yellow-600"><p class="text-xs text-gray-400 mb-1">Vendas</p><p class="text-4xl font-extrabold text-yellow-500">{{{{ total_vendas }}}}</p></div>
-            <div class="glass p-6 text-center border-t-2 border-blue-600"><p class="text-xs text-gray-400 mb-1">Pix Gerados</p><p class="text-4xl font-extrabold text-blue-500">{{{{ total_pagamentos }}}}</p></div>
-        </div>
-        <h2 class="text-lg font-bold text-white mb-4">📡 Servidores</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-            {{% for guild in guilds %}}
-            <div class="glass p-4 flex items-center gap-4">
-                {{% if guild.icon %}}<img src="{{{{ guild.icon }}}}" class="w-12 h-12 rounded-full border border-gray-600">{{% else %}}<div class="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center text-xs">T</div>{{% endif %}}
-                <div><h3 class="font-bold text-white text-md truncate w-40">{{{{ guild.name }}}}</h3><p class="text-xs text-gray-400">{{{{ guild.members }}}} membros</p></div>
+
+        <!-- ABA: VENDAS -->
+        <div id="vendas" class="tab-content">
+            <h1 class="text-3xl font-bold text-white mb-2">Histórico de Vendas</h1>
+            <p class="text-gray-400 mb-8">Quem clicou no botão de comprar VIP.</p>
+            <div class="glass p-6">
+                <table>
+                    <thead><tr><th>Usuário</th><th>Ação</th><th>Data</th></tr></thead>
+                    <tbody>
+                        {{% for log in logs_vendas %}}
+                        <tr><td class="font-bold text-white">{{{{ log.user_name }}}}</td><td class="text-yellow-500">{{{{ log.detalhe }}}}</td><td class="text-gray-500">{{{{ log.data }}}}</td></tr>
+                        {{% else %}}<tr><td colspan="3" class="text-center text-gray-500">Nenhuma venda registrada.</td></tr>{{% endfor %}}
+                    </tbody>
+                </table>
             </div>
-            {{% endfor %}}
         </div>
-    </div>
+
+        <!-- ABA: PAGAMENTOS -->
+        <div id="pagamentos" class="tab-content">
+            <h1 class="text-3xl font-bold text-white mb-2">Histórico de Pagamentos</h1>
+            <p class="text-gray-400 mb-8">Pix gerados e valores.</p>
+            <div class="glass p-6">
+                <table>
+                    <thead><tr><th>Usuário</th><th>Detalhe (Valor/Plano)</th><th>Data</th></tr></thead>
+                    <tbody>
+                        {{% for log in logs_pagamentos %}}
+                        <tr><td class="font-bold text-white">{{{{ log.user_name }}}}</td><td class="text-blue-500">{{{{ log.detalhe }}}}</td><td class="text-gray-500">{{{{ log.data }}}}</td></tr>
+                        {{% else %}}<tr><td colspan="3" class="text-center text-gray-500">Nenhum pix gerado.</td></tr>{{% endfor %}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ABA: USUÁRIOS (SÓ ADMIN) -->
+        {{% if current_user.is_admin %}}
+        <div id="usuarios" class="tab-content">
+            <h1 class="text-3xl font-bold text-white mb-2">Usuários Cadastrados</h1>
+            <p class="text-gray-400 mb-8">Lista de clientes do site.</p>
+            <div class="glass p-6">
+                <table>
+                    <thead><tr><th>ID</th><th>Usuário</th><th>E-mail</th><th>Token</th><th>Data Cadastro</th></tr></thead>
+                    <tbody>
+                        {{% for u in users %}}
+                        <tr><td class="text-gray-500">{{{{ u[0] }}}}</td><td class="font-bold text-white">{{{{ u[1] }}}}</td><td class="text-gray-400">{{{{ u[2] }}}}</td><td class="text-green-500 font-mono text-xs">{{{{ u[4] or 'Nenhum' }}}}</td><td class="text-gray-500">{{{{ u[5] }}}}</td></tr>
+                        {{% endfor %}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ABA: SERVIDORES (SÓ ADMIN) -->
+        <div id="servidores" class="tab-content">
+            <h1 class="text-3xl font-bold text-white mb-2">Servidores Conectados</h1>
+            <p class="text-gray-400 mb-8">Servidores onde o bot está atualmente.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {{% for guild in guilds %}}
+                <div class="glass p-4 flex items-center gap-4">
+                    {{% if guild.icon %}}<img src="{{{{ guild.icon }}}}" class="w-12 h-12 rounded-full border border-gray-600">{{% else %}}<div class="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center text-xs">T</div>{{% endif %}}
+                    <div><h3 class="font-bold text-white text-md truncate w-40">{{{{ guild.name }}}}</h3><p class="text-xs text-gray-400">{{{{ guild.members }}}} membros</p></div>
+                </div>
+                {{% endfor %}}
+            </div>
+        </div>
+        {{% endif %}}
+
+    </main>
+
+    <script>
+        function openTab(tabName, element) {{
+            // Esconde todas as abas
+            document.querySelectorAll('.tab-content').forEach(tab => {{ tab.classList.remove('active'); }});
+            // Remove a classe active de todos os botões
+            document.querySelectorAll('.sidebar-item').forEach(item => {{ item.classList.remove('active'); }});
+            
+            // Mostra a aba clicada
+            document.getElementById(tabName).classList.add('active');
+            // Adiciona a classe active no botão clicado
+            if(element) element.classList.add('active');
+        }}
+    </script>
 </body>
 </html>
 """
 
-# --- HTML: VENDAS (CASO NÃO TENHA TOKEN) ---
-HTML_VENDAS = f"""
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head><title>Acesso Bloqueado</title><script src="https://cdn.tailwindcss.com"></script>{GLOBAL_STYLE}</head>
-<body class="flex items-center justify-center h-screen">
-    <div class="bg-blobs"><div class="blob blob-1"></div></div>
-    <div class="glass p-10 w-[450px] text-center fade-up">
-        <h1 class="text-3xl font-bold text-red-500 mb-4">Acesso Restrito</h1>
-        <p class="text-gray-400 mb-8">Você precisa de um Token de Licença válido para acessar a Dashboard.</p>
-        <a href="/comprar" class="btn-primary block w-full py-3 mb-6">Comprar Token de Acesso</a>
-        <form method="POST" action="/validar_token">
-            <p class="text-xs text-gray-500 mb-2 uppercase">Já comprou? Ative aqui:</p>
-            <input type="text" name="token" placeholder="TRAMA-XXXX-XXXX" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white text-center focus:border-red-500 outline-none mb-4 uppercase" required>
-            <button type="submit" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition">Ativar Token</button>
-        </form>
-        <a href="/logout" class="block mt-6 text-sm text-gray-600 hover:text-white transition">Sair da Conta</a>
-    </div>
-</body>
-</html>
-"""
+# --- HTML: LANDING, LOGIN, CADASTRO, VENDAS (MANTIDOS) ---
+HTML_LANDING = f"""<!DOCTYPE html><html><head><title>Surf Trama</title><script src="https://cdn.tailwindcss.com"></script>{GLOBAL_STYLE}</head><body class="block p-6"><div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div></div><nav class="flex justify-between items-center max-w-7xl mx-auto mb-20 fade-up"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-700 to-red-500 flex items-center justify-center font-bold text-white text-xl">T</div><span class="text-2xl font-extrabold text-white">Surf Trama</span></div><div class="flex items-center gap-4"><a href="/login" class="text-gray-300 hover:text-white font-semibold transition">Entrar</a><a href="/cadastro" class="btn-primary text-sm">Criar Conta</a></div></nav><header class="text-center py-24 max-w-4xl mx-auto fade-up"><h1 class="text-5xl md:text-7xl font-extrabold mb-6 text-white">Domine seu servidor com <span class="text-red-600">inteligência</span>.</h1><p class="text-gray-400 text-lg mb-10">Moderação, engajamento, vendas e dashboard em um único bot.</p><a href="/cadastro" class="btn-primary text-lg px-10 py-4">Começar Agora</a></header></body></html>"""
 
-# --- ROTAS DO SITE ---
+HTML_LOGIN = f"""<!DOCTYPE html><html><head><title>Login</title><script src="https://cdn.tailwindcss.com"></script>{GLOBAL_STYLE}</head><body class="flex items-center justify-center h-screen"><div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div></div><div class="glass p-10 w-[400px] fade-up"><h1 class="text-2xl font-bold text-white text-center mb-6">Entrar no Painel</h1>{{% if error %}}<div class="bg-red-900/50 text-red-300 p-2 rounded mb-4 text-center">{{{{ error }}}}</div>{{% endif %}}<form method="POST" action="/login"><div class="mb-4"><label class="text-xs text-gray-400 uppercase">Usuário</label><input type="text" name="username" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white focus:border-red-500 outline-none" required></div><div class="mb-6"><label class="text-xs text-gray-400 uppercase">Senha</label><input type="password" name="password" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white focus:border-red-500 outline-none" required></div><button type="submit" class="btn-primary w-full py-3">Entrar</button></form><p class="text-center text-sm text-gray-500 mt-4">Não tem conta? <a href="/cadastro" class="text-red-500">Criar Conta</a></p></div></body></html>"""
+
+HTML_CADASTRO = f"""<!DOCTYPE html><html><head><title>Cadastro</title><script src="https://cdn.tailwindcss.com"></script>{GLOBAL_STYLE}</head><body class="flex items-center justify-center h-screen"><div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div></div><div class="glass p-10 w-[400px] fade-up"><h1 class="text-2xl font-bold text-white text-center mb-6">Crie sua Conta</h1>{{% if error %}}<div class="bg-red-900/50 text-red-300 p-2 rounded mb-4 text-center">{{{{ error }}}}</div>{{% endif %}}<form method="POST" action="/cadastro"><div class="mb-4"><label class="text-xs text-gray-400 uppercase">Usuário</label><input type="text" name="username" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white focus:border-red-500 outline-none" required></div><div class="mb-4"><label class="text-xs text-gray-400 uppercase">E-mail</label><input type="email" name="email" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white focus:border-red-500 outline-none" required></div><div class="mb-6"><label class="text-xs text-gray-400 uppercase">Senha</label><input type="password" name="password" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white focus:border-red-500 outline-none" required></div><button type="submit" class="btn-primary w-full py-3">Cadastrar</button></form><p class="text-center text-sm text-gray-500 mt-4">Já tem conta? <a href="/login" class="text-red-500">Fazer Login</a></p></div></body></html>"""
+
+HTML_VENDAS = f"""<!DOCTYPE html><html><head><title>Acesso Bloqueado</title><script src="https://cdn.tailwindcss.com"></script>{GLOBAL_STYLE}</head><body class="flex items-center justify-center h-screen"><div class="bg-blobs"><div class="blob blob-1"></div></div><div class="glass p-10 w-[450px] text-center fade-up"><h1 class="text-3xl font-bold text-red-500 mb-4">Acesso Restrito</h1><p class="text-gray-400 mb-8">Você precisa de um Token de Licença válido para acessar a Dashboard.</p><a href="/comprar" class="btn-primary block w-full py-3 mb-6">Comprar Token de Acesso</a><form method="POST" action="/validar_token"><p class="text-xs text-gray-500 mb-2 uppercase">Já comprou? Ative aqui:</p><input type="text" name="token" placeholder="TRAMA-XXXX-XXXX" class="w-full bg-black/50 border border-gray-700 rounded-xl p-3 text-white text-center focus:border-red-500 outline-none mb-4 uppercase" required><button type="submit" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition">Ativar Token</button></form><a href="/logout" class="block mt-6 text-sm text-gray-600 hover:text-white transition">Sair da Conta</a></div></body></html>"""
+
+# --- ROTAS ---
 @app.route('/')
 def landing(): return render_template_string(HTML_LANDING)
 
@@ -273,7 +293,8 @@ def cadastro():
         if username == 'surf157': return render_template_string(HTML_CADASTRO, error="Nome reservado.")
         conn = sqlite3.connect('tickets.db'); cursor = conn.cursor()
         try:
-            cursor.execute("INSERT INTO users (username, email, password_hash, token) VALUES (?, ?, ?, ?)", (username, email, generate_password_hash(password), None))
+            agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+            cursor.execute("INSERT INTO users (username, email, password_hash, token, created_at) VALUES (?, ?, ?, ?, ?)", (username, email, generate_password_hash(password), None, agora))
             conn.commit(); conn.close(); return redirect(url_for('login'))
         except sqlite3.IntegrityError:
             conn.close(); return render_template_string(HTML_CADASTRO, error="Usuário ou E-mail já cadastrado.")
@@ -283,28 +304,35 @@ def cadastro():
 @login_required
 def logout(): logout_user(); return redirect(url_for('landing'))
 
-@app.route('/validar_token', methods=['POST'])
-@login_required
-def validar_token():
-    token = request.form.get('token').upper()
-    if token in CHAVES_VALIDAS:
-        conn = sqlite3.connect('tickets.db'); cursor = conn.cursor()
-        cursor.execute("UPDATE users SET token = ? WHERE id = ?", (token, current_user.id))
-        conn.commit(); conn.close(); return redirect(url_for('dashboard'))
-    return render_template_string(HTML_VENDAS, error="Token inválido.")
-
 @app.route('/dashboard')
 @login_required
 def dashboard():
     if not current_user.token and not current_user.is_admin: return render_template_string(HTML_VENDAS)
     if not bot.is_ready(): return "Iniciando... Recarregue.", 200
+    
     conn = sqlite3.connect('tickets.db'); cursor = conn.cursor()
+    
+    # Totais
     cursor.execute("SELECT COUNT(*) FROM estatisticas WHERE tipo = 'Ticket'"); total_tickets = cursor.fetchone()[0] or 0
     cursor.execute("SELECT COUNT(*) FROM estatisticas WHERE tipo = 'Venda'"); total_vendas = cursor.fetchone()[0] or 0
     cursor.execute("SELECT COUNT(*) FROM estatisticas WHERE tipo = 'Pagamento'"); total_pagamentos = cursor.fetchone()[0] or 0
+
+    # Logs Separados por Aba
+    cursor.execute("SELECT tipo, user_name, detalhe, data FROM estatisticas ORDER BY id DESC LIMIT 20"); logs_recentes = cursor.fetchall()
+    cursor.execute("SELECT user_name, detalhe, data FROM estatisticas WHERE tipo = 'Ticket' ORDER BY id DESC"); logs_tickets = cursor.fetchall()
+    cursor.execute("SELECT user_name, detalhe, data FROM estatisticas WHERE tipo = 'Venda' ORDER BY id DESC"); logs_vendas = cursor.fetchall()
+    cursor.execute("SELECT user_name, detalhe, data FROM estatisticas WHERE tipo = 'Pagamento' ORDER BY id DESC"); logs_pagamentos = cursor.fetchall()
+
+    # Usuários (Apenas Admin)
+    users = []
+    if current_user.is_admin:
+        cursor.execute("SELECT id, username, email, password_hash, token, created_at FROM users ORDER BY id DESC")
+        users = cursor.fetchall()
+
     guilds_data = [{"id": g.id, "name": g.name, "icon": g.icon.url if g.icon else None, "members": g.member_count} for g in bot.guilds]
     conn.close()
-    return render_template_string(HTML_DASHBOARD, guilds=guilds_data, total_tickets=total_tickets, total_vendas=total_vendas, total_pagamentos=total_pagamentos)
+    
+    return render_template_string(HTML_DASHBOARD, guilds=guilds_data, total_tickets=total_tickets, total_vendas=total_vendas, total_pagamentos=total_pagamentos, users=users, logs_recentes=logs_recentes, logs_tickets=logs_tickets, logs_vendas=logs_vendas, logs_pagamentos=logs_pagamentos)
 
 def run_web():
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
